@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Square, RotateCcw, Gamepad2, BookOpen, Coffee, Save, History, Trophy, AlertCircle, X, CheckCircle2, Download, Upload, Settings, Target, Maximize2, Minimize2, AlertTriangle, Sparkles, BrainCircuit, Server, Cpu, RefreshCw, List } from 'lucide-react';
+import { Play, Pause, Square, RotateCcw, Gamepad2, BookOpen, Coffee, Save, History, Trophy, AlertCircle, X, CheckCircle2, Download, Upload, Settings, Target, Maximize2, Minimize2, AlertTriangle, Sparkles, BrainCircuit, Server, Cpu, RefreshCw, List, Send, Smile, Search, Filter, MessageCircle, ChevronDown } from 'lucide-react';
 
 // --- Utility Functions ---
 const formatTime = (seconds) => {
@@ -27,88 +27,30 @@ const getStageInfo = () => {
 
   if (month === 11 || month === 12) {
     if (year === TARGET_YEAR - 1) {
-      return {
-        name: "全真模拟演练期",
-        desc: "心态调整 / 考场适应",
-        targetHours: 6,
-        color: "text-blue-400",
-        borderColor: "border-blue-500"
-      };
+      return { name: "全真模拟演练期", desc: "心态调整 / 考场适应", targetHours: 6, color: "text-blue-400", borderColor: "border-blue-500" };
     } else {
-       return {
-        name: "终极冲刺期",
-        desc: "背水一战 / 回归基础",
-        targetHours: 11,
-        color: "text-red-500",
-        borderColor: "border-red-500"
-      };
+       return { name: "终极冲刺期", desc: "背水一战 / 回归基础", targetHours: 11, color: "text-red-500", borderColor: "border-red-500" };
     }
   } else if (month >= 1 && month <= 6) {
-    return {
-      name: "基础夯实期",
-      desc: "地毯式复习 / 英语单词",
-      targetHours: 7,
-      color: "text-emerald-400",
-      borderColor: "border-emerald-500"
-    };
+    return { name: "基础夯实期", desc: "地毯式复习 / 英语单词", targetHours: 7, color: "text-emerald-400", borderColor: "border-emerald-500" };
   } else if (month >= 7 && month <= 9) {
-    return {
-      name: "强化提升期",
-      desc: "海量刷题 / 攻克难点",
-      targetHours: 9,
-      color: "text-yellow-400",
-      borderColor: "border-yellow-500"
-    };
+    return { name: "强化提升期", desc: "海量刷题 / 攻克难点", targetHours: 9, color: "text-yellow-400", borderColor: "border-yellow-500" };
   } else {
-    return {
-      name: "真题实战期",
-      desc: "真题模拟 / 查缺",
-      targetHours: 10,
-      color: "text-orange-400",
-      borderColor: "border-orange-500"
-    };
+    return { name: "真题实战期", desc: "真题模拟 / 查缺", targetHours: 10, color: "text-orange-400", borderColor: "border-orange-500" };
   }
 };
 
 // --- API Presets ---
 const API_PROVIDERS = [
-  { 
-    id: 'siliconflow', 
-    name: '硅基流动 (SiliconFlow)', 
-    url: 'https://api.siliconflow.cn/v1',
-    defaultModel: 'deepseek-ai/DeepSeek-R1'
-  },
-  { 
-    id: 'deepseek', 
-    name: 'DeepSeek 官方', 
-    url: 'https://api.deepseek.com/v1', // 注意：DeepSeek 有时兼容 v1 或 beta，视具体文档
-    defaultModel: 'deepseek-chat'
-  },
-  { 
-    id: 'moonshot', 
-    name: '月之暗面 (Kimi)', 
-    url: 'https://api.moonshot.cn/v1',
-    defaultModel: 'moonshot-v1-8k'
-  },
-  { 
-    id: 'aliyun', 
-    name: '阿里云 (通义千问)', 
-    url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    defaultModel: 'qwen-turbo'
-  },
-  { 
-    id: 'openai', 
-    name: 'OpenAI (需要梯子)', 
-    url: 'https://api.openai.com/v1',
-    defaultModel: 'gpt-4o'
-  },
-  { 
-    id: 'custom', 
-    name: '自定义 (Custom)', 
-    url: '',
-    defaultModel: ''
-  }
+  { id: 'siliconflow', name: '硅基流动 (SiliconFlow)', url: 'https://api.siliconflow.cn/v1', defaultModel: 'deepseek-ai/DeepSeek-R1' },
+  { id: 'deepseek', name: 'DeepSeek 官方', url: 'https://api.deepseek.com/v1', defaultModel: 'deepseek-chat' },
+  { id: 'moonshot', name: '月之暗面 (Kimi)', url: 'https://api.moonshot.cn/v1', defaultModel: 'moonshot-v1-8k' },
+  { id: 'aliyun', name: '阿里云 (通义千问)', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen-turbo' },
+  { id: 'openai', name: 'OpenAI (需要梯子)', url: 'https://api.openai.com/v1', defaultModel: 'gpt-4o' },
+  { id: 'custom', name: '自定义 (Custom)', url: '', defaultModel: '' }
 ];
+
+const COMMON_EMOJIS = ['👍', '🔥', '💪', '😭', '🙏', '🎉', '🤔', '💤', '📚', '☕️', '🤖', '👻'];
 
 // --- Main Component ---
 export default function LevelUpApp() {
@@ -123,31 +65,32 @@ export default function LevelUpApp() {
   const [isZen, setIsZen] = useState(false);
   
   // Data State
-  const [todayStats, setTodayStats] = useState({
-    studyMinutes: 0,
-    gameBank: 0, 
-    gameUsed: 0,
-    logs: []
-  });
+  const [todayStats, setTodayStats] = useState({ studyMinutes: 0, gameBank: 0, gameUsed: 0, logs: [] });
   const [history, setHistory] = useState([]);
   
-  // AI Settings State
+  // AI Settings
   const [apiKey, setApiKey] = useState(''); 
   const [apiBaseUrl, setApiBaseUrl] = useState('https://api.siliconflow.cn/v1'); 
   const [apiModel, setApiModel] = useState('deepseek-ai/DeepSeek-R1');
   const [selectedProvider, setSelectedProvider] = useState('siliconflow');
   
-  // Model Discovery State
+  // Model Discovery & UI
   const [availableModels, setAvailableModels] = useState([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [isModelListOpen, setIsModelListOpen] = useState(false);
+  const [modelSearch, setModelSearch] = useState('');
   
+  // Chat State
+  const [chatMessages, setChatMessages] = useState([]); 
+  const [chatInput, setChatInput] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [aiThinking, setAiThinking] = useState(false);
+  const chatEndRef = useRef(null);
+
   // UI State
   const [showLogModal, setShowLogModal] = useState(false);
   const [showStopModal, setShowStopModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false); 
-  const [aiThinking, setAiThinking] = useState(false);
-  const [aiResponse, setAiResponse] = useState('');
-  const [usedModelID, setUsedModelID] = useState(''); // To display which model was actually used
+  const [showChatModal, setShowChatModal] = useState(false); 
   const [logContent, setLogContent] = useState('');
   const [pendingStudyTime, setPendingStudyTime] = useState(0); 
   const [showSettings, setShowSettings] = useState(false);
@@ -162,8 +105,6 @@ export default function LevelUpApp() {
     try {
       const todayStr = getTodayDateString();
       const storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
-      
-      // Load AI Settings
       const storedKey = localStorage.getItem('ai_api_key') || '';
       const storedBaseUrl = localStorage.getItem('ai_base_url') || 'https://api.siliconflow.cn/v1';
       const storedModel = localStorage.getItem('ai_model') || 'deepseek-ai/DeepSeek-R1';
@@ -182,21 +123,10 @@ export default function LevelUpApp() {
         setTodayStats(todayData);
       } else {
         let lastBank = 0;
-        if (storedHistory.length > 0) {
-           lastBank = storedHistory[0].gameBank;
-        }
-        const newToday = {
-          date: todayStr,
-          studyMinutes: 0,
-          gameBank: lastBank > 0 ? lastBank : 0, 
-          gameUsed: 0,
-          logs: []
-        };
-        setTodayStats(newToday);
+        if (storedHistory.length > 0) lastBank = storedHistory[0].gameBank;
+        setTodayStats({ date: todayStr, studyMinutes: 0, gameBank: lastBank > 0 ? lastBank : 0, gameUsed: 0, logs: [] });
       }
-    } catch (e) {
-      console.error("Load Error", e);
-    }
+    } catch (e) { console.error("Load Error", e); }
     setLoading(false);
   };
 
@@ -210,18 +140,11 @@ export default function LevelUpApp() {
       localStorage.setItem('levelup_history', JSON.stringify(storedHistory));
       setTodayStats(newTodayStats);
       setHistory(storedHistory);
-    } catch (e) {
-      console.error("Save Error", e);
-    }
+    } catch (e) { console.error("Save Error", e); }
   };
 
   const saveAISettings = (key, baseUrl, model, provider, modelList = availableModels) => {
-    setApiKey(key);
-    setApiBaseUrl(baseUrl);
-    setApiModel(model);
-    setSelectedProvider(provider);
-    setAvailableModels(modelList);
-    
+    setApiKey(key); setApiBaseUrl(baseUrl); setApiModel(model); setSelectedProvider(provider); setAvailableModels(modelList);
     localStorage.setItem('ai_api_key', key);
     localStorage.setItem('ai_base_url', baseUrl);
     localStorage.setItem('ai_model', model);
@@ -229,16 +152,18 @@ export default function LevelUpApp() {
     localStorage.setItem('ai_model_list', JSON.stringify(modelList));
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
+  
+  useEffect(() => { 
+    if (showChatModal) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, showChatModal]);
 
   // --- Timer Logic ---
   useEffect(() => {
     if (isActive && timeLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
+      timerRef.current = setInterval(() => { setTimeLeft((prev) => prev - 1); }, 1000);
     } else if (timeLeft === 0 && isActive) {
       handleTimerComplete();
     }
@@ -247,104 +172,44 @@ export default function LevelUpApp() {
 
   // --- Fullscreen Listener ---
   useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+    const handleFsChange = () => { setIsFullscreen(!!document.fullscreenElement); };
     document.addEventListener("fullscreenchange", handleFsChange);
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
-  // --- AI Logic ---
+  // --- AI & Chat Logic ---
   const fetchAvailableModels = async () => {
-    if (!apiKey) {
-      alert("请先输入 API Key！");
-      return;
-    }
-    
+    if (!apiKey) return alert("请先输入 API Key！");
     setIsFetchingModels(true);
     try {
       const cleanBaseUrl = apiBaseUrl.replace(/\/$/, '');
       const response = await fetch(`${cleanBaseUrl}/models`, {
         method: 'GET',
-        headers: { 
-          'Authorization': `Bearer ${apiKey}`
-        }
+        headers: { 'Authorization': `Bearer ${apiKey}` }
       });
-
       if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
       const data = await response.json();
-      
-      // Most OpenAI compatible APIs return { data: [{ id: 'model-name', ... }] }
       if (data.data && Array.isArray(data.data)) {
-        const models = data.data.map(m => m.id);
-        // Sort models alphabetically
-        models.sort();
+        const models = data.data.map(m => m.id).sort();
         setAvailableModels(models);
         saveAISettings(apiKey, apiBaseUrl, apiModel, selectedProvider, models);
-        alert(`成功获取 ${models.length} 个模型！请在下拉菜单中选择。`);
+        setIsModelListOpen(true); 
       } else {
-        alert("获取成功，但返回格式无法解析。请手动输入模型名称。");
-        console.log("Models response:", data);
+        alert("获取成功，但返回格式无法解析。");
       }
     } catch (error) {
-      alert(`获取模型列表失败: ${error.message}\n请检查 Key 和 API 地址是否正确。`);
+      alert(`获取失败: ${error.message}`);
     } finally {
       setIsFetchingModels(false);
     }
   };
 
-  const handleProviderChange = (e) => {
-    const newProviderId = e.target.value;
-    const provider = API_PROVIDERS.find(p => p.id === newProviderId);
-    if (provider) {
-      // Auto-fill details based on preset, but keep Key intact
-      saveAISettings(apiKey, provider.url, provider.defaultModel, newProviderId);
-    } else {
-      setSelectedProvider('custom');
-    }
-  };
-
-  const callAICoach = async () => {
-    if (!apiKey) {
-      alert("请先在设置中输入 API Key！");
-      setShowSettings(true);
-      return;
-    }
-
-    setShowAIModal(true);
+  const sendToAI = async (newMessages) => {
     setAiThinking(true);
-    setAiResponse('');
-    setUsedModelID('');
-
-    const yesterdayStr = getYesterdayDateString();
-    const yesterdayData = history.find(d => d.date === yesterdayStr);
-
-    let prompt = "";
-    if (!yesterdayData) {
-      prompt = `我是你的学生。昨天（${yesterdayStr}）我没有在App里记录任何学习数据。我现在的目标是考上上海交大或中科大的人工智能研究生。请用幽默、略带严厉但又充满鼓励的语气，问我昨天去哪了，并提醒我今天必须开始努力。字数控制在100字以内。`;
-    } else {
-      const studyHours = (yesterdayData.studyMinutes / 60).toFixed(1);
-      const gameMinutes = yesterdayData.gameUsed;
-      const target = stage.targetHours;
-      
-      prompt = `我是你的学生，正在备考上海交大/中科大人工智能硕士。昨天（${yesterdayStr}）我的数据如下：
-      - 有效学习时长：${studyHours} 小时
-      - 目标学习时长：${target} 小时
-      - 游戏消耗时长：${gameMinutes} 分钟
-      - 学习日志内容：${yesterdayData.logs.map(l => l.content).join('; ')}
-      
-      请根据以上数据对我进行“复盘”。
-      如果我达标了，请大力夸奖我，并结合我的日志内容给一些具体的鼓励。
-      如果我不达标，请温柔地询问我是不是遇到了困难，或者是不是偷懒了，并给我一些心理安慰和今天的行动建议。
-      语气要像一个真诚的朋友或二次元导师。字数控制在150字以内。`;
-    }
-
     try {
       const cleanBaseUrl = apiBaseUrl.replace(/\/$/, '');
-      // Some APIs use /v1/chat/completions, some have v1 in base url. 
-      // We assume Base URL includes /v1 if needed (as per presets).
       const endpoint = `${cleanBaseUrl}/chat/completions`;
-
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 
@@ -353,89 +218,93 @@ export default function LevelUpApp() {
         },
         body: JSON.stringify({
           model: apiModel,
-          messages: [{ role: "user", content: prompt }],
+          messages: newMessages,
           temperature: 0.7,
           stream: false
         })
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error?.message || JSON.stringify(data));
-      }
+      if (!response.ok) throw new Error(data.error?.message || JSON.stringify(data));
 
       if (data.choices && data.choices.length > 0) {
-        const text = data.choices[0].message.content; 
-        setAiResponse(text);
-        // Try to get the actual model used from response
-        setUsedModelID(data.model || apiModel);
-      } else {
-        throw new Error("API返回格式异常，无法读取回复。");
+        const reply = data.choices[0].message.content;
+        setChatMessages(prev => [...prev, { role: 'assistant', content: reply }]);
       }
-      
     } catch (error) {
-      setAiResponse(`连接 AI 失败...\n请检查设置。\n\nError: ${error.message}`);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ 连接失败: ${error.message}` }]);
     } finally {
       setAiThinking(false);
     }
   };
 
-  // --- Handlers ---
-  const handleTimerComplete = () => {
-    setIsActive(false);
-    setIsZen(false);
-    if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {});
+  const startAICoach = () => {
+    if (!apiKey) {
+      alert("请先在设置中输入 API Key！");
+      setShowSettings(true);
+      return;
     }
-    clearInterval(timerRef.current);
+    setShowChatModal(true);
     
-    if (mode === 'focus') {
-      const completedTime = initialTime;
-      setPendingStudyTime(completedTime);
-      setShowLogModal(true);
-    } else if (mode === 'gaming') {
-      alert("⚠️ 游戏时间耗尽！立即停止操作，回到现实！");
-      updateGameStats(initialTime); 
-    } else {
-      alert("🔔 休息结束，请立即开始下一轮专注！");
+    if (chatMessages.length === 0) {
+      const yesterdayStr = getYesterdayDateString();
+      const yesterdayData = history.find(d => d.date === yesterdayStr);
+      
+      let systemContext = `你是一位幽默、有时严厉但内心温暖的二次元风格考研导师。你的学生正在备考上海交大/中科大AI硕士（目标2026年）。
+      如果学生发表情包，你也请回复表情包。请用对话的形式与学生交流，不要一次性发长篇大论，要引导学生回复。
+      
+      昨天（${yesterdayStr}）数据：
+      `;
+      
+      if (!yesterdayData) {
+        systemContext += `学生没有记录任何数据。请直接发起对话，询问昨天去哪了，是不是偷懒了。`;
+      } else {
+        const studyHours = (yesterdayData.studyMinutes / 60).toFixed(1);
+        systemContext += `有效学习${studyHours}小时，目标${stage.targetHours}小时，玩游戏${yesterdayData.gameUsed}分钟。日志：${yesterdayData.logs.map(l => l.content).join(';')}`;
+      }
+
+      const initialMsg = { role: 'system', content: systemContext };
+      const triggerMsg = { role: 'user', content: "导师，我来了，看看我昨天的情况。" };
+      
+      const newHistory = [initialMsg, triggerMsg];
+      setChatMessages(newHistory); 
+      sendToAI(newHistory);
     }
   };
 
-  const updateStudyStats = (secondsStudied, logText) => {
-    const minutes = Math.floor(secondsStudied / 60);
-    const gameEarned = Math.floor(minutes / 4.5); 
-
-    const newStats = {
-      ...todayStats,
-      studyMinutes: todayStats.studyMinutes + minutes,
-      gameBank: todayStats.gameBank + gameEarned,
-      logs: [...todayStats.logs, {
-        time: new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute:'2-digit'}),
-        content: logText,
-        duration: minutes
-      }]
-    };
-    saveData(newStats);
+  const handleUserSend = () => {
+    if (!chatInput.trim()) return;
+    const newMsg = { role: 'user', content: chatInput };
+    const updatedHistory = [...chatMessages, newMsg];
+    setChatMessages(updatedHistory);
+    setChatInput('');
+    setShowEmojiPicker(false);
+    sendToAI(updatedHistory);
   };
 
-  const updateGameStats = (secondsPlayed) => {
-    const minutes = Math.floor(secondsPlayed / 60);
-    const newStats = {
-      ...todayStats,
-      gameUsed: todayStats.gameUsed + minutes,
-      gameBank: todayStats.gameBank - minutes
-    };
-    saveData(newStats);
+  const handleEmojiClick = (emoji) => {
+    setChatInput(prev => prev + emoji);
   };
 
-  const saveLog = () => {
-    if (!logContent.trim()) return;
-    updateStudyStats(pendingStudyTime, logContent);
-    setShowLogModal(false);
-    setLogContent('');
-    setPendingStudyTime(0);
-    switchMode('break');
+  // --- Helpers for State Updates ---
+  const updateStudyStats = (seconds, log) => {
+    const m = Math.floor(seconds / 60);
+    const g = Math.floor(m / 4.5); 
+    saveData({ ...todayStats, studyMinutes: todayStats.studyMinutes + m, gameBank: todayStats.gameBank + g, logs: [...todayStats.logs, { time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}), content: log, duration: m }] });
+  };
+
+  const updateGameStats = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    saveData({ ...todayStats, gameUsed: todayStats.gameUsed + m, gameBank: todayStats.gameBank - m });
+  };
+
+  const saveLog = () => { 
+    if(logContent.trim()){ 
+      updateStudyStats(pendingStudyTime, logContent); 
+      setShowLogModal(false); 
+      setLogContent(''); 
+      switchMode('break'); 
+    }
   };
 
   const switchMode = (newMode) => {
@@ -496,69 +365,38 @@ export default function LevelUpApp() {
     }
   };
 
-  const triggerStopTimer = () => setShowStopModal(true);
-
-  const confirmStopTimer = () => {
-    setShowStopModal(false);
-    setIsActive(false);
+  const handleTimerComplete = () => {
+    setIsActive(false); 
     setIsZen(false);
-    setTimeLeft(initialTime);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-
-    if (mode === 'gaming') {
-      const usedSeconds = initialTime - timeLeft;
-      if (usedSeconds > 60) {
-           updateGameStats(usedSeconds);
-      }
-    }
+    clearInterval(timerRef.current);
+    if (mode === 'focus') {
+      setPendingStudyTime(initialTime); setShowLogModal(true);
+    } else if (mode === 'gaming') {
+      alert("⚠️ 游戏时间耗尽！"); updateGameStats(initialTime); 
+    } else { alert("🔔 休息结束！"); }
   };
 
+  const triggerStopTimer = () => setShowStopModal(true);
+  const confirmStopTimer = () => { setShowStopModal(false); setIsActive(false); setIsZen(false); setTimeLeft(initialTime); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); if(mode==='gaming') updateGameStats(initialTime-timeLeft); };
   const cancelStopTimer = () => setShowStopModal(false);
-
+  
   const handleExportData = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `LevelUp_Backup_${getTodayDateString()}.json`);
-    document.body.appendChild(downloadAnchorNode); 
-    document.body.removeChild(downloadAnchorNode); 
-  };
-
-  const handleImportData = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const importedData = JSON.parse(e.target.result);
-        if (!Array.isArray(importedData)) throw new Error("Format invalid");
-        if (window.confirm(`确认导入 ${importedData.length} 条历史记录吗？`)) {
-           localStorage.setItem('levelup_history', JSON.stringify(importedData));
-           loadData(); 
-           alert("导入成功！");
-        }
-      } catch (err) {
-        alert("导入失败：文件格式不正确");
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const progress = ((initialTime - timeLeft) / initialTime) * 100;
-  const displayedDailyTargetMin = stage.targetHours * 60; 
-  const dailyProgressPercent = Math.min((todayStats.studyMinutes / displayedDailyTargetMin) * 100, 100);
-
-  const getThemeColor = () => {
-    if (mode === 'focus') return 'text-emerald-400 border-emerald-500 shadow-emerald-900/50';
-    if (mode === 'break') return 'text-blue-400 border-blue-500 shadow-blue-900/50';
-    if (mode === 'gaming') return 'text-purple-400 border-purple-500 shadow-purple-900/50';
+    const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history));
+    const a = document.createElement('a'); a.href = str; a.download = `LevelUp_Backup_${getTodayDateString()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
   
-  const getBgColor = () => {
-     if (mode === 'focus') return 'from-emerald-950/90 to-black';
-     if (mode === 'break') return 'from-blue-950/90 to-black';
-     if (mode === 'gaming') return 'from-purple-950/90 to-black';
+  const handleImportData = (e) => {
+    const f = e.target.files[0]; if(!f)return; const r = new FileReader();
+    r.onload = (ev) => { try { const d = JSON.parse(ev.target.result); if(window.confirm(`导入 ${d.length} 条记录?`)) { localStorage.setItem('levelup_history', JSON.stringify(d)); loadData(); alert("成功!"); } } catch(err){alert("失败");} };
+    r.readAsText(f);
   };
+
+  // --- Render ---
+  const progress = ((initialTime - timeLeft) / initialTime) * 100;
+  const dailyProgressPercent = Math.min((todayStats.studyMinutes / (stage.targetHours*60)) * 100, 100);
+  const getThemeColor = () => mode === 'focus' ? 'text-emerald-400 border-emerald-500 shadow-emerald-900/50' : mode === 'break' ? 'text-blue-400 border-blue-500 shadow-blue-900/50' : 'text-purple-400 border-purple-500 shadow-purple-900/50';
+  const getBgColor = () => mode === 'focus' ? 'from-emerald-950/90 to-black' : mode === 'break' ? 'from-blue-950/90 to-black' : 'from-purple-950/90 to-black';
 
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
@@ -566,252 +404,189 @@ export default function LevelUpApp() {
     <div ref={appContainerRef} className={`h-[100dvh] w-full bg-black text-gray-100 font-sans flex flex-col md:flex-row overflow-hidden transition-all duration-500 overscroll-none`}>
       
       {/* Sidebar */}
-      <div className={`${isZen ? 'hidden' : 'flex'} flex-col w-full md:w-96 bg-gray-900/90 border-b md:border-b-0 md:border-r border-gray-800 p-4 md:p-6 gap-4 md:gap-6 overflow-y-auto z-20 shadow-2xl flex-shrink-0 h-1/3 md:h-full`}>
+      <div className={`${isZen ? 'hidden' : 'flex'} flex-col w-full md:w-96 bg-gray-900/90 border-b md:border-b-0 md:border-r border-gray-800 p-4 md:p-6 gap-4 overflow-y-auto z-20 shadow-2xl flex-shrink-0 h-1/3 md:h-full`}>
         <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">LEVEL UP!</h1>
-            <p className="text-[10px] text-gray-500 font-mono mt-1">UNIVERSAL AI EDITION</p>
-          </div>
+          <div><h1 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">LEVEL UP!</h1><p className="text-[10px] text-gray-500 font-mono">CHAT COACH EDITION</p></div>
           <button onClick={() => setShowSettings(!showSettings)} className="text-gray-500 hover:text-white transition"><Settings className="w-5 h-5" /></button>
         </div>
 
-        <button 
-          onClick={callAICoach}
-          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02]"
-        >
-          <Sparkles className="w-5 h-5" /> 召唤 AI 昨夜复盘
+        <button onClick={startAICoach} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02]">
+          <MessageCircle className="w-5 h-5" /> 进入 AI 导师聊天室
         </button>
 
         {showSettings && (
           <div className="bg-gray-800 rounded-lg p-4 text-xs animate-in fade-in slide-in-from-top-2 space-y-4">
             <div>
-              <h3 className="text-gray-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit className="w-4 h-4"/> AI 模型设置</h3>
-              
-              {/* API Provider Select */}
+              <h3 className="text-gray-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit className="w-4 h-4"/> AI 模型配置</h3>
               <div className="mb-2">
-                <label className="text-gray-500 block mb-1">服务商 (Provider)</label>
-                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2">
-                  <select 
-                    value={selectedProvider} 
-                    onChange={handleProviderChange}
-                    className="w-full bg-transparent py-2 text-white outline-none border-none"
-                  >
-                    {API_PROVIDERS.map(p => (
-                      <option key={p.id} value={p.id} className="bg-gray-900">{p.name}</option>
-                    ))}
+                <label className="text-gray-500 block mb-1">服务商</label>
+                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2 relative">
+                  <select value={selectedProvider} onChange={(e) => {
+                    const p = API_PROVIDERS.find(x => x.id === e.target.value);
+                    if (p) saveAISettings(apiKey, p.url, p.defaultModel, p.id);
+                    else setSelectedProvider('custom');
+                  }} className="w-full bg-transparent py-2 text-white outline-none border-none appearance-none z-10">
+                    {API_PROVIDERS.map(p => <option key={p.id} value={p.id} className="bg-gray-900">{p.name}</option>)}
                   </select>
+                  <ChevronDown className="w-4 h-4 text-gray-500 absolute right-2" />
                 </div>
               </div>
-
-              {/* API Address */}
-              <div className="mb-2">
-                <label className="text-gray-500 block mb-1">API 地址 (Base URL)</label>
-                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2">
-                  <Server className="w-3 h-3 text-gray-500 mr-2 flex-shrink-0" />
-                  <input 
-                    type="text" 
-                    value={apiBaseUrl}
-                    onChange={(e) => saveAISettings(apiKey, e.target.value, apiModel, 'custom')}
-                    className="w-full bg-transparent py-2 text-white outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* API Key */}
               <div className="mb-2">
                 <label className="text-gray-500 block mb-1">API Key</label>
-                <input 
-                  type="password" 
-                  placeholder="sk-..." 
-                  value={apiKey}
-                  onChange={(e) => saveAISettings(e.target.value, apiBaseUrl, apiModel, selectedProvider)}
-                  className="w-full bg-black/50 border border-gray-600 rounded p-2 text-white outline-none focus:border-purple-500"
-                />
+                <input type="password" placeholder="sk-..." value={apiKey} onChange={(e) => saveAISettings(e.target.value, apiBaseUrl, apiModel, selectedProvider)} className="w-full bg-black/50 border border-gray-600 rounded p-2 text-white outline-none focus:border-purple-500"/>
               </div>
-
-              {/* Model Name & Fetch Button */}
-              <div className="mb-2">
+              <div className="mb-2 relative">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-gray-500">模型名称</label>
-                  <button 
-                    onClick={fetchAvailableModels} 
-                    className="text-[9px] bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded hover:bg-purple-800 flex items-center gap-1"
-                    disabled={isFetchingModels}
-                  >
-                    {isFetchingModels ? <RefreshCw className="w-3 h-3 animate-spin"/> : <List className="w-3 h-3"/>}
-                    {isFetchingModels ? '获取中...' : '获取可用模型'}
-                  </button>
+                  <button onClick={fetchAvailableModels} disabled={isFetchingModels} className="text-[9px] bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded flex items-center gap-1">{isFetchingModels ? <RefreshCw className="w-3 h-3 animate-spin"/> : <List className="w-3 h-3"/>} 获取列表</button>
                 </div>
-                
                 <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2">
                   <Cpu className="w-3 h-3 text-gray-500 mr-2 flex-shrink-0" />
-                  <input 
-                    type="text" 
-                    list="model-suggestions"
-                    placeholder="deepseek-chat" 
-                    value={apiModel}
-                    onChange={(e) => saveAISettings(apiKey, apiBaseUrl, e.target.value, selectedProvider)}
-                    className="w-full bg-transparent py-2 text-white outline-none"
-                  />
-                  {/* Datalist for auto-complete */}
-                  <datalist id="model-suggestions">
-                    {availableModels.map(m => <option key={m} value={m} />)}
-                  </datalist>
+                  <input type="text" value={apiModel} onChange={(e) => { setApiModel(e.target.value); setIsModelListOpen(true); setModelSearch(e.target.value); }} onFocus={() => setIsModelListOpen(true)} className="w-full bg-transparent py-2 text-white outline-none" placeholder="输入或选择模型"/>
+                  <button onClick={() => setIsModelListOpen(!isModelListOpen)}><ChevronDown className="w-4 h-4 text-gray-500" /></button>
                 </div>
-                {availableModels.length > 0 && (
-                  <p className="text-green-500 text-[9px] mt-1">✓ 已加载 {availableModels.length} 个模型 (点击输入框查看)</p>
+                
+                {/* Custom Dropdown for Models */}
+                {isModelListOpen && availableModels.length > 0 && (
+                  <div className="absolute top-full left-0 w-full bg-gray-800 border border-gray-700 rounded-b-lg shadow-xl max-h-40 overflow-y-auto z-50 mt-1">
+                    <div className="sticky top-0 bg-gray-800 p-2 border-b border-gray-700 flex items-center gap-2">
+                      <Search className="w-3 h-3 text-gray-500" />
+                      <input type="text" value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} placeholder="搜索模型..." className="w-full bg-transparent text-white outline-none text-xs"/>
+                    </div>
+                    {availableModels.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase())).map(m => (
+                      <div key={m} onClick={() => { setApiModel(m); saveAISettings(apiKey, apiBaseUrl, m, selectedProvider); setIsModelListOpen(false); }} className="px-3 py-2 hover:bg-purple-900/30 cursor-pointer truncate">{m}</div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
-            
-            <div className="border-t border-gray-700 pt-3">
-              <h3 className="text-gray-400 font-bold mb-2">数据备份</h3>
-              <div className="flex gap-2">
-                <button onClick={handleExportData} className="flex-1 bg-gray-700 hover:bg-gray-600 p-2 rounded flex items-center justify-center gap-1"><Download className="w-3 h-3" /> 导出</button>
-                <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-gray-700 hover:bg-gray-600 p-2 rounded flex items-center justify-center gap-1"><Upload className="w-3 h-3" /> 导入</button>
-                <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
-              </div>
+            <div className="border-t border-gray-700 pt-3 flex gap-2">
+              <button onClick={handleExportData} className="flex-1 bg-gray-700 p-2 rounded flex justify-center gap-1"><Download className="w-3 h-3"/> 导出</button>
+              <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-gray-700 p-2 rounded flex justify-center gap-1"><Upload className="w-3 h-3"/> 导入</button>
+              <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
             </div>
           </div>
         )}
 
-        {/* Stage Card & Stats ... (Same as before) */}
+        {/* Stats & Logs UI */}
         <div className={`rounded-xl p-3 md:p-4 border-l-4 ${stage.borderColor} bg-gray-800/50`}>
-          <div className="flex items-center gap-2 mb-1">
-             <Target className={`w-4 h-4 ${stage.color}`} />
-             <span className={`text-xs font-bold uppercase tracking-wider ${stage.color}`}>阶段: {stage.name}</span>
-          </div>
-          <div className="pl-6">
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-500">今日目标</span>
-              <span className="text-white font-mono">{stage.targetHours}h</span>
-            </div>
-            <div className="h-1.5 w-full bg-gray-700 rounded-full overflow-hidden">
-               <div className={`h-full ${stage.color.replace('text', 'bg')} transition-all duration-1000`} style={{ width: `${dailyProgressPercent}%` }}></div>
-            </div>
-            <div className="text-[10px] text-gray-500 mt-1 text-right">{(todayStats.studyMinutes/60).toFixed(1)}h / {stage.targetHours}h</div>
-          </div>
+          <div className="flex items-center gap-2 mb-1"><Target className={`w-4 h-4 ${stage.color}`} /><span className={`text-xs font-bold ${stage.color}`}>阶段: {stage.name}</span></div>
+          <div className="pl-6 text-[10px] text-gray-500">{(todayStats.studyMinutes/60).toFixed(1)}h / {stage.targetHours}h</div>
         </div>
-
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <h2 className="text-sm font-semibold text-gray-400 mb-2 flex items-center gap-2"><History className="w-4 h-4" /> 战斗日志</h2>
-          <div className="space-y-2 pr-1">
-            {todayStats.logs && todayStats.logs.length > 0 ? ([...todayStats.logs].reverse().map((log, idx) => (
-                <div key={idx} className="bg-gray-800/30 p-2 rounded border-l-2 border-emerald-500/50 text-xs">
-                  <div className="flex justify-between text-gray-500 mb-1"><span className="font-mono">{log.time}</span><span className="text-emerald-500">+{log.duration}m</span></div>
-                  <div className="text-gray-300 truncate">{log.content}</div>
-                </div>
-              ))) : (<div className="text-center py-4 text-gray-600 text-xs italic">暂无记录</div>)}
-          </div>
+        <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-1">
+           {todayStats.logs && todayStats.logs.slice().reverse().map((log, i) => (
+             <div key={i} className="bg-gray-800/30 p-2 rounded border-l-2 border-emerald-500/50 text-xs text-gray-300 truncate">{log.content}</div>
+           ))}
         </div>
       </div>
 
-      {/* Main Timer Area */}
-      <div className={`flex-1 flex flex-col items-center justify-center p-4 relative bg-gradient-to-br ${getBgColor()} transition-colors duration-1000 overflow-hidden`}>
-        {/* Fullscreen Toggle */}
-        <div className={`absolute top-4 right-4 z-30 transition-opacity duration-300 ${isZen && isActive ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}>
-           {isZen && <button onClick={() => setIsZen(false)} className="mr-2 bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white px-3 py-2 rounded text-xs transition backdrop-blur-md">退出禅模式</button>}
-           <button onClick={toggleFullScreen} className="bg-gray-800/50 hover:bg-gray-700 text-white p-2 rounded-lg backdrop-blur-sm transition-all shadow-lg">{isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}</button>
+      {/* Main Timer */}
+      <div className={`flex-1 flex flex-col items-center justify-center p-4 relative bg-gradient-to-br ${getBgColor()} transition-colors duration-1000`}>
+        <div className={`absolute top-4 right-4 z-30 ${isZen && isActive ? 'opacity-0 hover:opacity-100' : ''}`}>
+           {isZen && <button onClick={() => setIsZen(false)} className="mr-2 bg-gray-800/50 text-gray-400 px-3 py-2 rounded text-xs">退出禅模式</button>}
+           <button onClick={toggleFullScreen} className="bg-gray-800/50 text-white p-2 rounded-lg">{isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}</button>
         </div>
-
-        {/* Mode Switcher */}
-        <div className={`flex gap-2 mb-8 md:mb-12 bg-gray-900/80 backdrop-blur-md p-1.5 md:p-2 rounded-2xl border border-gray-700/50 shadow-2xl z-10 transition-all duration-500 ${isZen ? '-translate-y-40 opacity-0 scale-75 absolute' : 'translate-y-0 opacity-100 scale-100'}`}>
-          <button onClick={() => switchMode('focus')} className={`flex items-center gap-2 px-3 md:px-6 py-2 md:py-3 rounded-xl text-xs md:text-sm font-bold transition-all ${mode === 'focus' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/50 scale-105' : 'text-gray-400'}`}><BookOpen className="w-4 h-4" /> <span className="hidden md:inline">专注</span></button>
-          <button onClick={() => switchMode('break')} className={`flex items-center gap-2 px-3 md:px-6 py-2 md:py-3 rounded-xl text-xs md:text-sm font-bold transition-all ${mode === 'break' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50 scale-105' : 'text-gray-400'}`}><Coffee className="w-4 h-4" /> <span className="hidden md:inline">休息</span></button>
-          <button onClick={() => switchMode('gaming')} className={`flex items-center gap-2 px-3 md:px-6 py-2 md:py-3 rounded-xl text-xs md:text-sm font-bold transition-all ${mode === 'gaming' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50 scale-105' : 'text-gray-400'}`}><Gamepad2 className="w-4 h-4" /> <span className="hidden md:inline">奖励</span></button>
+        <div className={`flex gap-2 mb-8 md:mb-12 bg-gray-900/80 p-1.5 rounded-2xl border border-gray-700/50 z-10 ${isZen ? '-translate-y-40 opacity-0 absolute' : ''}`}>
+          <button onClick={() => switchMode('focus')} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold ${mode === 'focus' ? 'bg-emerald-600 text-white' : 'text-gray-400'}`}><BookOpen className="w-4 h-4"/> 专注</button>
+          <button onClick={() => switchMode('break')} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold ${mode === 'break' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}><Coffee className="w-4 h-4"/> 休息</button>
+          <button onClick={() => switchMode('gaming')} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold ${mode === 'gaming' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}><Gamepad2 className="w-4 h-4"/> 奖励</button>
         </div>
-
-        {/* Timer Circle */}
-        <div className={`relative mb-8 md:mb-12 group transition-all duration-700 ease-in-out ${isZen ? 'scale-125 md:scale-150' : 'scale-100'}`}>
-          {!isZen && (<><div className={`absolute inset-0 rounded-full border-4 border-gray-800/50 scale-110`}></div><div className={`absolute inset-0 rounded-full border-4 opacity-20 blur-md transition-all duration-500 ${getThemeColor().split(' ')[0].replace('text', 'border')}`}></div></>)}
-          <div className={`rounded-full flex items-center justify-center relative transition-all duration-500 shadow-2xl ${isZen ? 'border-0' : `border-8 bg-gray-900 ${getThemeColor()}`}`} style={{ width: 'min(70vmin, 320px)', height: 'min(70vmin, 320px)' }}>
-             <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
-               {!isZen && <circle cx="50" cy="50" r="44" fill="none" stroke="#1f2937" strokeWidth="4" />}
-               <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth={isZen ? "2" : "4"} strokeLinecap="round" strokeDasharray="276" strokeDashoffset={276 - (276 * progress) / 100} className={`transition-all duration-1000 ease-linear ${isZen ? 'text-white/20' : ''}`}/>
-             </svg>
-             <div className="flex flex-col items-center z-10 select-none w-full">
-               <div className={`font-mono font-bold tabular-nums text-center whitespace-nowrap text-white drop-shadow-2xl transition-all duration-500 w-[5ch] ${isZen ? 'text-[15vmin]' : 'text-[12vmin] md:text-7xl'}`}>{formatTime(timeLeft)}</div>
-               <div className={`text-xs md:text-sm mt-2 md:mt-4 font-bold tracking-widest uppercase transition-all duration-500 ${mode === 'focus' ? 'text-emerald-400' : mode === 'break' ? 'text-blue-400' : 'text-purple-400'} ${isZen ? 'opacity-50' : 'opacity-100'}`}>{mode === 'focus' ? 'DEEP WORK' : mode === 'break' ? 'RECHARGE' : 'GAME ON'}</div>
-             </div>
+        {/* Timer Circle Visuals */}
+        <div className={`relative mb-8 group ${isZen ? 'scale-125' : 'scale-100'}`}>
+          {!isZen && <div className={`absolute inset-0 rounded-full border-4 border-gray-800/50 scale-110`}></div>}
+          <div className={`rounded-full flex items-center justify-center relative shadow-2xl ${isZen ? 'border-0' : `border-8 bg-gray-900 ${getThemeColor()}`}`} style={{ width: 'min(70vmin, 320px)', height: 'min(70vmin, 320px)' }}>
+             <div className={`font-mono font-bold tabular-nums text-center text-white drop-shadow-2xl w-[5ch] ${isZen ? 'text-[15vmin]' : 'text-[12vmin]'}`}>{formatTime(timeLeft)}</div>
           </div>
         </div>
-
-        {/* Controls */}
-        <div className={`flex gap-4 md:gap-6 z-10 transition-all duration-300 ${isZen && isActive ? 'opacity-100' : 'opacity-100'}`}>
-           {!isActive ? (
-             <button onClick={toggleTimer} className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition-all shadow-lg active:scale-95"><Play className="w-6 h-6 md:w-8 md:h-8 ml-1" /></button>
-           ) : (
-             <div className="flex gap-4 md:gap-6">
-                <button onClick={toggleTimer} className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gray-800 border-2 border-gray-600 text-white flex items-center justify-center hover:bg-gray-700 transition-all active:scale-95 shadow-xl"><Pause className="w-6 h-6 md:w-8 md:h-8" /></button>
-                <button onClick={triggerStopTimer} className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-950/30 border-2 border-red-900/50 text-red-500 flex items-center justify-center hover:bg-red-900/40 transition-all active:scale-95 shadow-xl"><Square className="w-5 h-5 md:w-6 md:h-6" /></button>
-             </div>
-           )}
-           {!isZen && (<button onClick={() => { setIsActive(false); setTimeLeft(initialTime); }} className="absolute bottom-6 right-6 md:static w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-800/50 border border-gray-700 text-gray-400 flex items-center justify-center hover:text-white transition-all" title="Reset Timer"><RotateCcw className="w-4 h-4" /></button>)}
+        <div className={`flex gap-4 z-10 ${isZen && isActive ? 'opacity-100' : ''}`}>
+           {!isActive ? <button onClick={toggleTimer} className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95"><Play className="w-8 h-8 ml-1"/></button> : <div className="flex gap-4"><button onClick={toggleTimer} className="w-16 h-16 rounded-full bg-gray-800 border-2 border-gray-600 text-white flex items-center justify-center active:scale-95"><Pause className="w-8 h-8"/></button><button onClick={triggerStopTimer} className="w-16 h-16 rounded-full bg-red-950/30 border-2 border-red-900/50 text-red-500 flex items-center justify-center active:scale-95"><Square className="w-6 h-6"/></button></div>}
         </div>
       </div>
 
-      {/* Modals */}
-      {showStopModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-gray-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="flex items-center gap-3 mb-4 text-red-500"><AlertTriangle className="w-6 h-6" /><h3 className="text-lg font-bold text-white">确定要放弃吗？</h3></div>
-            <p className="text-gray-400 text-sm mb-6">如果现在停止，你本次的努力将<span className="text-red-400 font-bold">不会获得任何奖励</span>。</p>
-            <div className="flex gap-3">
-              <button onClick={cancelStopTimer} className="flex-1 bg-gray-800 text-white font-bold py-3 rounded-xl">继续坚持</button>
-              <button onClick={confirmStopTimer} className="flex-1 bg-red-900/50 text-red-200 border border-red-800 font-bold py-3 rounded-xl">放弃</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* AI Modal */}
-      {showAIModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-gray-900 border border-purple-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[80vh] overflow-y-auto relative">
-            <button onClick={() => setShowAIModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X className="w-5 h-5" /></button>
-            <div className="flex items-center gap-3 mb-6 text-purple-400">
-              <Sparkles className="w-8 h-8" />
-              <h3 className="text-xl font-bold text-white">AI 导师复盘</h3>
-            </div>
-            
-            {aiThinking ? (
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-gray-400 text-sm animate-pulse">正在连接大脑，分析你的战斗数据...</p>
+      {/* Chat Modal (WeChat Style) */}
+      {showChatModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
+          <div className="bg-gray-900 w-full md:max-w-md h-full md:h-[80vh] md:rounded-2xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800">
+            {/* Header */}
+            <div className="p-4 bg-gray-800 border-b border-gray-700 flex justify-between items-center z-10 shadow-md">
+              <div className="flex items-center gap-2 text-white font-bold">
+                <Sparkles className="w-5 h-5 text-purple-400" /> 
+                <span>AI 导师</span>
+                <span className="text-[10px] bg-purple-900 px-1.5 rounded text-purple-200 font-normal">{apiModel}</span>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
-                  <p className="text-gray-200 leading-relaxed whitespace-pre-wrap">{aiResponse}</p>
-                </div>
-                
-                {/* 显示使用的模型 */}
-                {usedModelID && (
-                  <div className="flex justify-end">
-                    <span className="text-[10px] text-gray-600 bg-gray-900 px-2 py-1 rounded border border-gray-800">
-                      Generated by: {usedModelID}
-                    </span>
-                  </div>
-                )}
+              <button onClick={() => setShowChatModal(false)} className="text-gray-400 hover:text-white"><X className="w-6 h-6"/></button>
+            </div>
 
-                <button 
-                  onClick={() => setShowAIModal(false)}
-                  className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition-colors"
-                >
-                  收下建议，继续战斗！
+            {/* Chat Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/50">
+              {chatMessages.filter(m => m.role !== 'system').map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed ${
+                    msg.role === 'user' 
+                      ? 'bg-emerald-600 text-white rounded-br-none' 
+                      : 'bg-gray-700 text-gray-100 rounded-bl-none'
+                  }`}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {aiThinking && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-700 p-3 rounded-2xl rounded-bl-none flex gap-1 items-center">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input Area */}
+            <div className="p-3 bg-gray-800 border-t border-gray-700 flex flex-col gap-2">
+              {/* Emoji Picker Popover */}
+              {showEmojiPicker && (
+                <div className="bg-gray-700 p-2 rounded-lg grid grid-cols-6 gap-2 mb-2 absolute bottom-16 left-2 shadow-xl border border-gray-600">
+                  {COMMON_EMOJIS.map(e => (
+                    <button key={e} onClick={() => handleEmojiClick(e)} className="text-xl hover:bg-gray-600 p-1 rounded">{e}</button>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-gray-400 hover:text-yellow-400 transition"><Smile className="w-6 h-6"/></button>
+                <input 
+                  type="text" 
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleUserSend()}
+                  placeholder="回复导师..." 
+                  className="flex-1 bg-black/50 border border-gray-600 rounded-full px-4 py-2 text-white outline-none focus:border-emerald-500"
+                />
+                <button onClick={handleUserSend} disabled={!chatInput.trim() || aiThinking} className="bg-emerald-600 text-white p-2 rounded-full hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                  <Send className="w-5 h-5 ml-0.5" />
                 </button>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}
 
+      {/* Stop Modal & Log Modal */}
+      {showStopModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><AlertTriangle className="text-red-500"/> 确定放弃？</h3>
+            <div className="flex gap-3"><button onClick={cancelStopTimer} className="flex-1 bg-gray-800 text-white py-3 rounded-xl">继续</button><button onClick={confirmStopTimer} className="flex-1 bg-red-900/50 text-red-200 border border-red-800 py-3 rounded-xl">放弃</button></div>
+          </div>
+        </div>
+      )}
       {showLogModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-emerald-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <div className="flex items-center gap-3 mb-4 text-emerald-400"><CheckCircle2 className="w-6 h-6" /><h3 className="text-lg font-bold text-white">任务完成！</h3></div>
-            <textarea value={logContent} onChange={(e) => setLogContent(e.target.value)} placeholder="记录一下刚才学了什么..." className="w-full bg-black/50 border border-gray-700 rounded-xl p-4 text-white min-h-[100px] mb-4 focus:border-emerald-500 outline-none" autoFocus />
-            <button onClick={saveLog} disabled={!logContent.trim()} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg disabled:opacity-50">存入档案 (+10m 券)</button>
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><CheckCircle2 className="text-emerald-400"/> 任务完成！</h3>
+            <textarea value={logContent} onChange={(e)=>setLogContent(e.target.value)} className="w-full bg-black/50 border border-gray-700 rounded-xl p-4 text-white min-h-[100px] mb-4 outline-none" autoFocus/>
+            <button onClick={saveLog} disabled={!logContent.trim()} className="w-full bg-emerald-600 text-white py-3 rounded-xl shadow-lg">存入档案</button>
           </div>
         </div>
       )}
