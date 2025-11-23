@@ -106,6 +106,7 @@ export default function LevelUpApp() {
       const todayStr = getTodayDateString();
       const storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
       
+      // Load AI Settings
       const storedKey = localStorage.getItem('ai_api_key') || '';
       const storedBaseUrl = localStorage.getItem('ai_base_url') || 'https://api.siliconflow.cn/v1';
       const storedModel = localStorage.getItem('ai_model') || 'deepseek-ai/DeepSeek-R1';
@@ -184,6 +185,7 @@ export default function LevelUpApp() {
     setIsFetchingModels(true);
     try {
       const cleanBaseUrl = apiBaseUrl.replace(/\/$/, '');
+      // SiliconFlow 使用 /models，DeepSeek 可能略有不同，这里做通用尝试
       const response = await fetch(`${cleanBaseUrl}/models`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${apiKey}` }
@@ -261,7 +263,7 @@ export default function LevelUpApp() {
         systemContext += `学生没有记录任何数据。请直接发起对话，询问昨天去哪了，是不是偷懒了。`;
       } else {
         const studyHours = (yesterdayData.studyMinutes / 60).toFixed(1);
-        systemContext += `有效学习${studyHours}小时，目标${stage.targetHours}小时，玩游戏${yesterdayData.gameUsed}分钟。日志：${yesterdayData.logs.map(l => l.content).join(';')}`;
+        systemContext += `有效学习${studyHours}小时，目标${stage.targetHours}小时，玩游戏${yesterdayData.gameUsed}分钟。日志：${yesterdayData.logs.map(l => typeof l.content === 'string' ? l.content : JSON.stringify(l)).join(';')}`;
       }
 
       const initialMsg = { role: 'system', content: systemContext };
@@ -338,23 +340,16 @@ export default function LevelUpApp() {
     // Safely check for fullscreen capability
     const isFullscreenAvailable = document.fullscreenEnabled || document.webkitFullscreenEnabled;
     
-    if (!isFullscreenAvailable) {
-        console.log("Fullscreen not supported in this environment");
-        return;
-    }
+    if (!isFullscreenAvailable) return;
 
     if (!document.fullscreenElement) {
       try {
         await appContainerRef.current.requestFullscreen();
-      } catch (err) { 
-        console.log("Enter fullscreen failed", err);
-      }
+      } catch (err) { console.log("Fullscr err", err); }
     } else {
       try {
         if (document.exitFullscreen) await document.exitFullscreen();
-      } catch (err) {
-        console.log("Exit fullscreen failed", err);
-      }
+      } catch (err) { console.log("Exit Fullscr err", err); }
     }
   };
 
@@ -367,11 +362,8 @@ export default function LevelUpApp() {
       setIsActive(true);
       if (mode === 'focus') {
         setIsZen(true);
-        if (!document.fullscreenElement) {
-            // Safe call to fullscreen
-            if (appContainerRef.current && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
-                appContainerRef.current.requestFullscreen().catch(() => {});
-            }
+        if (appContainerRef.current && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
+            appContainerRef.current.requestFullscreen().catch(() => {});
         }
       }
     } else {
@@ -392,9 +384,18 @@ export default function LevelUpApp() {
   };
 
   const triggerStopTimer = () => setShowStopModal(true);
-  const confirmStopTimer = () => { setShowStopModal(false); setIsActive(false); setIsZen(false); setTimeLeft(initialTime); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); if(mode==='gaming') updateGameStats(initialTime-timeLeft); };
-  const cancelStopTimer = () => setShowStopModal(false);
   
+  const confirmStopTimer = () => { 
+    setShowStopModal(false); 
+    setIsActive(false); 
+    setIsZen(false); 
+    setTimeLeft(initialTime); 
+    if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); 
+    if(mode==='gaming') updateGameStats(initialTime-timeLeft); 
+  };
+  
+  const cancelStopTimer = () => setShowStopModal(false);
+
   const handleExportData = () => {
     const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history));
     const a = document.createElement('a'); a.href = str; a.download = `LevelUp_Backup_${getTodayDateString()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -410,7 +411,7 @@ export default function LevelUpApp() {
   const progress = ((initialTime - timeLeft) / initialTime) * 100;
   const dailyProgressPercent = Math.min((todayStats.studyMinutes / (stage.targetHours*60)) * 100, 100);
   
-  // Fix: Define getThemeColor and getBgColor BEFORE return
+  // Fix: Define getThemeColor and getBgColor properly
   const getThemeColor = () => {
     if (mode === 'focus') return 'text-emerald-400 border-emerald-500 shadow-emerald-900/50';
     if (mode === 'break') return 'text-blue-400 border-blue-500 shadow-blue-900/50';
@@ -423,10 +424,10 @@ export default function LevelUpApp() {
      if (mode === 'gaming') return 'from-purple-950/90 to-black';
   };
 
-  // Ensure currentTheme objects are valid
+  // Ensure currentTheme objects are valid and accessible
   const currentTheme = {
     color: getThemeColor(),
-    // 额外的样式对象，用于某些特定的背景
+    // 额外的样式对象
     textColor: mode === 'focus' ? 'text-emerald-400' : mode === 'break' ? 'text-blue-400' : 'text-purple-400'
   };
 
@@ -436,8 +437,7 @@ export default function LevelUpApp() {
     <div ref={appContainerRef} className={`h-[100dvh] w-full bg-[#0a0a0a] text-gray-100 font-sans flex flex-col md:flex-row overflow-hidden relative`}>
       {/* 背景纹理 */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(20,20,40,0.4),transparent_70%)] pointer-events-none"></div>
-      <div className="absolute inset-0 opacity-5 pointer-events-none mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
-
+      
       {/* Sidebar */}
       <div className={`${isZen ? 'hidden' : 'flex'} flex-col w-full md:w-96 bg-[#111116] border-b md:border-b-0 md:border-r border-gray-800 p-4 md:p-6 gap-4 overflow-y-auto z-20 shadow-2xl flex-shrink-0 h-1/3 md:h-full relative group`}>
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-purple-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
@@ -522,7 +522,7 @@ export default function LevelUpApp() {
            {todayStats.logs && todayStats.logs.slice().reverse().map((log, i) => (
              <div key={i} className="bg-[#1a1a20] p-3 rounded border-l-2 border-emerald-500/50 text-xs text-gray-300 relative group hover:bg-[#222228] transition-colors">
                <div className="flex justify-between text-gray-500 mb-1"><span className="font-mono text-emerald-600">{log.time}</span><span className="text-emerald-500/80">+{log.duration}m XP</span></div>
-               <div className="truncate">{log.content}</div>
+               <div className="truncate">{typeof log.content === 'string' ? log.content : 'Log Entry'}</div>
              </div>
            ))}
         </div>
@@ -542,7 +542,7 @@ export default function LevelUpApp() {
         </div>
 
         <div className={`relative mb-8 group transition-all duration-1000 ${isZen ? 'scale-125 md:scale-150' : 'scale-100'}`}>
-          <div className={`rounded-full flex items-center justify-center relative shadow-[0_0_50px_-10px_currentColor] transition-all duration-1000 ${isZen ? '' : `border-8 bg-black/50 backdrop-blur-sm ${currentTheme.color.split(' ')[1] /* Takes the border class */}`}`} style={{ width: 'min(70vmin, 320px)', height: 'min(70vmin, 320px)' }}>
+          <div className={`rounded-full flex items-center justify-center relative shadow-[0_0_50px_-10px_currentColor] transition-all duration-1000 ${isZen ? '' : `border-8 bg-black/50 backdrop-blur-sm ${currentTheme.color.split(' ')[1]}`}`} style={{ width: 'min(70vmin, 320px)', height: 'min(70vmin, 320px)' }}>
              <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
                {!isZen && <circle cx="50" cy="50" r="44" fill="none" stroke="#222" strokeWidth="2" />}
                <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth={isZen ? "2" : "4"} strokeLinecap="round" strokeDasharray="276" strokeDashoffset={276 - (276 * progress) / 100} className={`transition-all duration-1000 ease-linear ${isZen ? 'text-white/30' : ''}`}/>
@@ -582,7 +582,9 @@ export default function LevelUpApp() {
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0a0a0a]">
               {chatMessages.filter(m => m.role !== 'system').map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                  <div className={`max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-md ${msg.role === 'user' ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-[#1f1f27] text-gray-200 rounded-bl-none border border-gray-800'}`}>{msg.content}</div>
+                  <div className={`max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-md ${msg.role === 'user' ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-[#1f1f27] text-gray-200 rounded-bl-none border border-gray-800'}`}>
+                    {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
+                  </div>
                 </div>
               ))}
               {aiThinking && (

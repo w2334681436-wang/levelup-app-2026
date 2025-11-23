@@ -15,9 +15,8 @@ export default defineConfig({
         theme_color: '#000000',
         background_color: '#000000',
         display: 'standalone',
-        orientation: 'portrait', // 强制竖屏，解决黄色警告
+        orientation: 'portrait',
         icons: [
-          // 使用 PNG 格式，安卓打包必须要 PNG
           {
             src: 'https://placehold.co/192x192/8B5CF6/FFFFFF/png?text=LevelUp',
             sizes: '192x192',
