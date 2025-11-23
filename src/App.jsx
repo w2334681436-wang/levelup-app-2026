@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Square, RotateCcw, Gamepad2, BookOpen, Coffee, Save, History, Trophy, AlertCircle, X, CheckCircle2, Download, Upload, Settings, Target, Maximize2, Minimize2, AlertTriangle, Sparkles, BrainCircuit } from 'lucide-react';
+import { Play, Pause, Square, RotateCcw, Gamepad2, BookOpen, Coffee, Save, History, Trophy, AlertCircle, X, CheckCircle2, Download, Upload, Settings, Target, Maximize2, Minimize2, AlertTriangle, Sparkles, BrainCircuit, Server, Cpu, RefreshCw, List } from 'lucide-react';
 
 // --- Utility Functions ---
 const formatTime = (seconds) => {
@@ -70,6 +70,46 @@ const getStageInfo = () => {
   }
 };
 
+// --- API Presets ---
+const API_PROVIDERS = [
+  { 
+    id: 'siliconflow', 
+    name: '硅基流动 (SiliconFlow)', 
+    url: 'https://api.siliconflow.cn/v1',
+    defaultModel: 'deepseek-ai/DeepSeek-R1'
+  },
+  { 
+    id: 'deepseek', 
+    name: 'DeepSeek 官方', 
+    url: 'https://api.deepseek.com/v1', // 注意：DeepSeek 有时兼容 v1 或 beta，视具体文档
+    defaultModel: 'deepseek-chat'
+  },
+  { 
+    id: 'moonshot', 
+    name: '月之暗面 (Kimi)', 
+    url: 'https://api.moonshot.cn/v1',
+    defaultModel: 'moonshot-v1-8k'
+  },
+  { 
+    id: 'aliyun', 
+    name: '阿里云 (通义千问)', 
+    url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    defaultModel: 'qwen-turbo'
+  },
+  { 
+    id: 'openai', 
+    name: 'OpenAI (需要梯子)', 
+    url: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o'
+  },
+  { 
+    id: 'custom', 
+    name: '自定义 (Custom)', 
+    url: '',
+    defaultModel: ''
+  }
+];
+
 // --- Main Component ---
 export default function LevelUpApp() {
   const [loading, setLoading] = useState(true);
@@ -90,14 +130,24 @@ export default function LevelUpApp() {
     logs: []
   });
   const [history, setHistory] = useState([]);
-  const [apiKey, setApiKey] = useState(''); // API Key State
+  
+  // AI Settings State
+  const [apiKey, setApiKey] = useState(''); 
+  const [apiBaseUrl, setApiBaseUrl] = useState('https://api.siliconflow.cn/v1'); 
+  const [apiModel, setApiModel] = useState('deepseek-ai/DeepSeek-R1');
+  const [selectedProvider, setSelectedProvider] = useState('siliconflow');
+  
+  // Model Discovery State
+  const [availableModels, setAvailableModels] = useState([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
   
   // UI State
   const [showLogModal, setShowLogModal] = useState(false);
   const [showStopModal, setShowStopModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false); // AI Modal
+  const [showAIModal, setShowAIModal] = useState(false); 
   const [aiThinking, setAiThinking] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
+  const [usedModelID, setUsedModelID] = useState(''); // To display which model was actually used
   const [logContent, setLogContent] = useState('');
   const [pendingStudyTime, setPendingStudyTime] = useState(0); 
   const [showSettings, setShowSettings] = useState(false);
@@ -112,10 +162,20 @@ export default function LevelUpApp() {
     try {
       const todayStr = getTodayDateString();
       const storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
-      const storedKey = localStorage.getItem('gemini_api_key') || '';
+      
+      // Load AI Settings
+      const storedKey = localStorage.getItem('ai_api_key') || '';
+      const storedBaseUrl = localStorage.getItem('ai_base_url') || 'https://api.siliconflow.cn/v1';
+      const storedModel = localStorage.getItem('ai_model') || 'deepseek-ai/DeepSeek-R1';
+      const storedProvider = localStorage.getItem('ai_provider') || 'siliconflow';
+      const storedModelList = JSON.parse(localStorage.getItem('ai_model_list') || '[]');
       
       setHistory(storedHistory);
       setApiKey(storedKey);
+      setApiBaseUrl(storedBaseUrl);
+      setApiModel(storedModel);
+      setSelectedProvider(storedProvider);
+      setAvailableModels(storedModelList);
 
       const todayData = storedHistory.find(d => d.date === todayStr);
       if (todayData) {
@@ -155,9 +215,18 @@ export default function LevelUpApp() {
     }
   };
 
-  const saveApiKey = (key) => {
+  const saveAISettings = (key, baseUrl, model, provider, modelList = availableModels) => {
     setApiKey(key);
-    localStorage.setItem('gemini_api_key', key);
+    setApiBaseUrl(baseUrl);
+    setApiModel(model);
+    setSelectedProvider(provider);
+    setAvailableModels(modelList);
+    
+    localStorage.setItem('ai_api_key', key);
+    localStorage.setItem('ai_base_url', baseUrl);
+    localStorage.setItem('ai_model', model);
+    localStorage.setItem('ai_provider', provider);
+    localStorage.setItem('ai_model_list', JSON.stringify(modelList));
   };
 
   useEffect(() => {
@@ -185,10 +254,59 @@ export default function LevelUpApp() {
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
-  // --- AI Coach Logic ---
+  // --- AI Logic ---
+  const fetchAvailableModels = async () => {
+    if (!apiKey) {
+      alert("请先输入 API Key！");
+      return;
+    }
+    
+    setIsFetchingModels(true);
+    try {
+      const cleanBaseUrl = apiBaseUrl.replace(/\/$/, '');
+      const response = await fetch(`${cleanBaseUrl}/models`, {
+        method: 'GET',
+        headers: { 
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+
+      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+      const data = await response.json();
+      
+      // Most OpenAI compatible APIs return { data: [{ id: 'model-name', ... }] }
+      if (data.data && Array.isArray(data.data)) {
+        const models = data.data.map(m => m.id);
+        // Sort models alphabetically
+        models.sort();
+        setAvailableModels(models);
+        saveAISettings(apiKey, apiBaseUrl, apiModel, selectedProvider, models);
+        alert(`成功获取 ${models.length} 个模型！请在下拉菜单中选择。`);
+      } else {
+        alert("获取成功，但返回格式无法解析。请手动输入模型名称。");
+        console.log("Models response:", data);
+      }
+    } catch (error) {
+      alert(`获取模型列表失败: ${error.message}\n请检查 Key 和 API 地址是否正确。`);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
+  const handleProviderChange = (e) => {
+    const newProviderId = e.target.value;
+    const provider = API_PROVIDERS.find(p => p.id === newProviderId);
+    if (provider) {
+      // Auto-fill details based on preset, but keep Key intact
+      saveAISettings(apiKey, provider.url, provider.defaultModel, newProviderId);
+    } else {
+      setSelectedProvider('custom');
+    }
+  };
+
   const callAICoach = async () => {
     if (!apiKey) {
-      alert("请先在设置中输入你的 Google Gemini API Key！");
+      alert("请先在设置中输入 API Key！");
       setShowSettings(true);
       return;
     }
@@ -196,6 +314,7 @@ export default function LevelUpApp() {
     setShowAIModal(true);
     setAiThinking(true);
     setAiResponse('');
+    setUsedModelID('');
 
     const yesterdayStr = getYesterdayDateString();
     const yesterdayData = history.find(d => d.date === yesterdayStr);
@@ -221,22 +340,42 @@ export default function LevelUpApp() {
     }
 
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      const cleanBaseUrl = apiBaseUrl.replace(/\/$/, '');
+      // Some APIs use /v1/chat/completions, some have v1 in base url. 
+      // We assume Base URL includes /v1 if needed (as per presets).
+      const endpoint = `${cleanBaseUrl}/chat/completions`;
+
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
+          model: apiModel,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.7,
+          stream: false
         })
       });
 
       const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error.message);
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || JSON.stringify(data));
       }
-      const text = data.candidates[0].content.parts[0].text;
-      setAiResponse(text);
+
+      if (data.choices && data.choices.length > 0) {
+        const text = data.choices[0].message.content; 
+        setAiResponse(text);
+        // Try to get the actual model used from response
+        setUsedModelID(data.model || apiModel);
+      } else {
+        throw new Error("API返回格式异常，无法读取回复。");
+      }
+      
     } catch (error) {
-      setAiResponse("连接 AI 大脑失败... 请检查你的网络（梯子）或 API Key 是否正确。\n\nError: " + error.message);
+      setAiResponse(`连接 AI 失败...\n请检查设置。\n\nError: ${error.message}`);
     } finally {
       setAiThinking(false);
     }
@@ -376,15 +515,13 @@ export default function LevelUpApp() {
 
   const cancelStopTimer = () => setShowStopModal(false);
 
-  // --- Export/Import ---
   const handleExportData = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
     downloadAnchorNode.setAttribute("download", `LevelUp_Backup_${getTodayDateString()}.json`);
     document.body.appendChild(downloadAnchorNode); 
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+    document.body.removeChild(downloadAnchorNode); 
   };
 
   const handleImportData = (event) => {
@@ -407,7 +544,6 @@ export default function LevelUpApp() {
     reader.readAsText(file);
   };
 
-  // --- Render Helpers ---
   const progress = ((initialTime - timeLeft) / initialTime) * 100;
   const displayedDailyTargetMin = stage.targetHours * 60; 
   const dailyProgressPercent = Math.min((todayStats.studyMinutes / displayedDailyTargetMin) * 100, 100);
@@ -434,12 +570,11 @@ export default function LevelUpApp() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">LEVEL UP!</h1>
-            <p className="text-[10px] text-gray-500 font-mono mt-1">AI COACH EDITION</p>
+            <p className="text-[10px] text-gray-500 font-mono mt-1">UNIVERSAL AI EDITION</p>
           </div>
           <button onClick={() => setShowSettings(!showSettings)} className="text-gray-500 hover:text-white transition"><Settings className="w-5 h-5" /></button>
         </div>
 
-        {/* AI Coach Button */}
         <button 
           onClick={callAICoach}
           className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02]"
@@ -450,21 +585,86 @@ export default function LevelUpApp() {
         {showSettings && (
           <div className="bg-gray-800 rounded-lg p-4 text-xs animate-in fade-in slide-in-from-top-2 space-y-4">
             <div>
-              <h3 className="text-gray-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit className="w-4 h-4"/> AI 设置 (Google Gemini)</h3>
-              <input 
-                type="password" 
-                placeholder="在此粘贴 API Key..." 
-                value={apiKey}
-                onChange={(e) => saveApiKey(e.target.value)}
-                className="w-full bg-black/50 border border-gray-600 rounded p-2 text-white mb-1 focus:border-purple-500 outline-none"
-              />
-              <p className="text-gray-500 text-[10px]">
-                * Key 仅保存在本地浏览器，不会上传。请使用支持 Google 的网络。
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-purple-400 underline ml-1">免费获取 Key</a>
-              </p>
+              <h3 className="text-gray-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit className="w-4 h-4"/> AI 模型设置</h3>
+              
+              {/* API Provider Select */}
+              <div className="mb-2">
+                <label className="text-gray-500 block mb-1">服务商 (Provider)</label>
+                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2">
+                  <select 
+                    value={selectedProvider} 
+                    onChange={handleProviderChange}
+                    className="w-full bg-transparent py-2 text-white outline-none border-none"
+                  >
+                    {API_PROVIDERS.map(p => (
+                      <option key={p.id} value={p.id} className="bg-gray-900">{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* API Address */}
+              <div className="mb-2">
+                <label className="text-gray-500 block mb-1">API 地址 (Base URL)</label>
+                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2">
+                  <Server className="w-3 h-3 text-gray-500 mr-2 flex-shrink-0" />
+                  <input 
+                    type="text" 
+                    value={apiBaseUrl}
+                    onChange={(e) => saveAISettings(apiKey, e.target.value, apiModel, 'custom')}
+                    className="w-full bg-transparent py-2 text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* API Key */}
+              <div className="mb-2">
+                <label className="text-gray-500 block mb-1">API Key</label>
+                <input 
+                  type="password" 
+                  placeholder="sk-..." 
+                  value={apiKey}
+                  onChange={(e) => saveAISettings(e.target.value, apiBaseUrl, apiModel, selectedProvider)}
+                  className="w-full bg-black/50 border border-gray-600 rounded p-2 text-white outline-none focus:border-purple-500"
+                />
+              </div>
+
+              {/* Model Name & Fetch Button */}
+              <div className="mb-2">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-gray-500">模型名称</label>
+                  <button 
+                    onClick={fetchAvailableModels} 
+                    className="text-[9px] bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded hover:bg-purple-800 flex items-center gap-1"
+                    disabled={isFetchingModels}
+                  >
+                    {isFetchingModels ? <RefreshCw className="w-3 h-3 animate-spin"/> : <List className="w-3 h-3"/>}
+                    {isFetchingModels ? '获取中...' : '获取可用模型'}
+                  </button>
+                </div>
+                
+                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2">
+                  <Cpu className="w-3 h-3 text-gray-500 mr-2 flex-shrink-0" />
+                  <input 
+                    type="text" 
+                    list="model-suggestions"
+                    placeholder="deepseek-chat" 
+                    value={apiModel}
+                    onChange={(e) => saveAISettings(apiKey, apiBaseUrl, e.target.value, selectedProvider)}
+                    className="w-full bg-transparent py-2 text-white outline-none"
+                  />
+                  {/* Datalist for auto-complete */}
+                  <datalist id="model-suggestions">
+                    {availableModels.map(m => <option key={m} value={m} />)}
+                  </datalist>
+                </div>
+                {availableModels.length > 0 && (
+                  <p className="text-green-500 text-[9px] mt-1">✓ 已加载 {availableModels.length} 个模型 (点击输入框查看)</p>
+                )}
+              </div>
             </div>
             
-            <div>
+            <div className="border-t border-gray-700 pt-3">
               <h3 className="text-gray-400 font-bold mb-2">数据备份</h3>
               <div className="flex gap-2">
                 <button onClick={handleExportData} className="flex-1 bg-gray-700 hover:bg-gray-600 p-2 rounded flex items-center justify-center gap-1"><Download className="w-3 h-3" /> 导出</button>
@@ -475,6 +675,7 @@ export default function LevelUpApp() {
           </div>
         )}
 
+        {/* Stage Card & Stats ... (Same as before) */}
         <div className={`rounded-xl p-3 md:p-4 border-l-4 ${stage.borderColor} bg-gray-800/50`}>
           <div className="flex items-center gap-2 mb-1">
              <Target className={`w-4 h-4 ${stage.color}`} />
@@ -576,13 +777,23 @@ export default function LevelUpApp() {
             {aiThinking ? (
               <div className="flex flex-col items-center justify-center py-8 space-y-4">
                 <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-gray-400 text-sm animate-pulse">正在分析你的战斗数据...</p>
+                <p className="text-gray-400 text-sm animate-pulse">正在连接大脑，分析你的战斗数据...</p>
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
                   <p className="text-gray-200 leading-relaxed whitespace-pre-wrap">{aiResponse}</p>
                 </div>
+                
+                {/* 显示使用的模型 */}
+                {usedModelID && (
+                  <div className="flex justify-end">
+                    <span className="text-[10px] text-gray-600 bg-gray-900 px-2 py-1 rounded border border-gray-800">
+                      Generated by: {usedModelID}
+                    </span>
+                  </div>
+                )}
+
                 <button 
                   onClick={() => setShowAIModal(false)}
                   className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition-colors"
