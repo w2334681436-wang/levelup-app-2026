@@ -109,24 +109,15 @@ export default function LevelUpApp() {
       if (todayData) {
         setTodayStats(todayData);
       } else {
-        // Init today but keeping the gameBank from yesterday is NOT implemented to force simple logic
-        // But usually gameBank should persist. Let's try to find latest gameBank.
         let lastBank = 0;
         if (storedHistory.length > 0) {
-           lastBank = storedHistory[0].gameBank; // sorted desc usually
-           // Actually, let's keep it simple: Daily Reset or Persistent?
-           // Let's persist bank.
-           // Find most recent entry
-           // For simplicity in this LocalStorage version, bank is per day record, 
-           // but we can look at the "global" bank.
-           // To keep it robust: We just start fresh today, but maybe carry over?
-           // Let's stick to: Bank is property of the day.
+           lastBank = storedHistory[0].gameBank;
         }
         
         const newToday = {
           date: todayStr,
           studyMinutes: 0,
-          gameBank: lastBank > 0 ? lastBank : 0, // Carry over logic simplified
+          gameBank: lastBank > 0 ? lastBank : 0, 
           gameUsed: 0,
           logs: []
         };
@@ -143,16 +134,10 @@ export default function LevelUpApp() {
       const todayStr = getTodayDateString();
       let storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
       
-      // Remove old entry for today if exists
       storedHistory = storedHistory.filter(d => d.date !== todayStr);
-      
-      // Add new
       storedHistory.unshift(newTodayStats);
-      
-      // Sort desc
       storedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
       
-      // Save
       localStorage.setItem('levelup_history', JSON.stringify(storedHistory));
       
       setTodayStats(newTodayStats);
@@ -471,7 +456,7 @@ export default function LevelUpApp() {
                <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth={isZen ? "2" : "4"} strokeLinecap="round" strokeDasharray="276" strokeDashoffset={276 - (276 * progress) / 100} className={`transition-all duration-1000 ease-linear ${isZen ? 'text-white/20' : ''}`}/>
              </svg>
              <div className="flex flex-col items-center z-10 select-none">
-               <div className={`font-mono font-bold tracking-tighter tabular-nums text-white drop-shadow-2xl transition-all duration-500 ${isZen ? 'text-8xl' : 'text-6xl md:text-7xl'}`}>{formatTime(timeLeft)}</div>
+               <div className={`font-mono font-bold tabular-nums text-center whitespace-nowrap text-white drop-shadow-2xl transition-all duration-500 w-[5ch] ${isZen ? 'text-8xl' : 'text-6xl md:text-7xl'}`}>{formatTime(timeLeft)}</div>
                <div className={`text-sm mt-4 font-bold tracking-widest uppercase transition-all duration-500 ${mode === 'focus' ? 'text-emerald-400' : mode === 'break' ? 'text-blue-400' : 'text-purple-400'} ${isZen ? 'opacity-50' : 'opacity-100'}`}>{mode === 'focus' ? 'DEEP WORK' : mode === 'break' ? 'RECHARGE' : 'GAME ON'}</div>
                {!isZen && mode === 'focus' && isActive && (<div className="text-[10px] text-gray-500 mt-2 bg-gray-800 px-2 py-1 rounded-full animate-pulse border border-gray-700">预计收益: +{Math.floor(initialTime / 60 / 4.5)}m 券</div>)}
              </div>
