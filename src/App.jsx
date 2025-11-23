@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Square, RotateCcw, Gamepad2, BookOpen, Coffee, Save, History, Trophy, AlertCircle, X, CheckCircle2, Download, Upload, Settings, Target, Maximize2, Minimize2, AlertTriangle } from 'lucide-react';
+import { Play, Pause, Square, RotateCcw, Gamepad2, BookOpen, Coffee, Save, History, Trophy, AlertCircle, X, CheckCircle2, Download, Upload, Settings, Target, Maximize2, Minimize2, AlertTriangle, Sparkles, BrainCircuit } from 'lucide-react';
 
 // --- Utility Functions ---
 const formatTime = (seconds) => {
@@ -10,6 +10,12 @@ const formatTime = (seconds) => {
 
 const getTodayDateString = () => {
   const date = new Date();
+  return date.toISOString().split('T')[0];
+};
+
+const getYesterdayDateString = () => {
+  const date = new Date();
+  date.setDate(date.getDate() - 1);
   return date.toISOString().split('T')[0];
 };
 
@@ -84,10 +90,14 @@ export default function LevelUpApp() {
     logs: []
   });
   const [history, setHistory] = useState([]);
+  const [apiKey, setApiKey] = useState(''); // API Key State
   
   // UI State
   const [showLogModal, setShowLogModal] = useState(false);
   const [showStopModal, setShowStopModal] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false); // AI Modal
+  const [aiThinking, setAiThinking] = useState(false);
+  const [aiResponse, setAiResponse] = useState('');
   const [logContent, setLogContent] = useState('');
   const [pendingStudyTime, setPendingStudyTime] = useState(0); 
   const [showSettings, setShowSettings] = useState(false);
@@ -102,7 +112,10 @@ export default function LevelUpApp() {
     try {
       const todayStr = getTodayDateString();
       const storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
+      const storedKey = localStorage.getItem('gemini_api_key') || '';
+      
       setHistory(storedHistory);
+      setApiKey(storedKey);
 
       const todayData = storedHistory.find(d => d.date === todayStr);
       if (todayData) {
@@ -131,18 +144,20 @@ export default function LevelUpApp() {
     try {
       const todayStr = getTodayDateString();
       let storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
-      
       storedHistory = storedHistory.filter(d => d.date !== todayStr);
       storedHistory.unshift(newTodayStats);
       storedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
-      
       localStorage.setItem('levelup_history', JSON.stringify(storedHistory));
-      
       setTodayStats(newTodayStats);
       setHistory(storedHistory);
     } catch (e) {
       console.error("Save Error", e);
     }
+  };
+
+  const saveApiKey = (key) => {
+    setApiKey(key);
+    localStorage.setItem('gemini_api_key', key);
   };
 
   useEffect(() => {
@@ -169,6 +184,63 @@ export default function LevelUpApp() {
     document.addEventListener("fullscreenchange", handleFsChange);
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
+
+  // --- AI Coach Logic ---
+  const callAICoach = async () => {
+    if (!apiKey) {
+      alert("请先在设置中输入你的 Google Gemini API Key！");
+      setShowSettings(true);
+      return;
+    }
+
+    setShowAIModal(true);
+    setAiThinking(true);
+    setAiResponse('');
+
+    const yesterdayStr = getYesterdayDateString();
+    const yesterdayData = history.find(d => d.date === yesterdayStr);
+
+    let prompt = "";
+    if (!yesterdayData) {
+      prompt = `我是你的学生。昨天（${yesterdayStr}）我没有在App里记录任何学习数据。我现在的目标是考上上海交大或中科大的人工智能研究生。请用幽默、略带严厉但又充满鼓励的语气，问我昨天去哪了，并提醒我今天必须开始努力。字数控制在100字以内。`;
+    } else {
+      const studyHours = (yesterdayData.studyMinutes / 60).toFixed(1);
+      const gameMinutes = yesterdayData.gameUsed;
+      const target = stage.targetHours;
+      
+      prompt = `我是你的学生，正在备考上海交大/中科大人工智能硕士。昨天（${yesterdayStr}）我的数据如下：
+      - 有效学习时长：${studyHours} 小时
+      - 目标学习时长：${target} 小时
+      - 游戏消耗时长：${gameMinutes} 分钟
+      - 学习日志内容：${yesterdayData.logs.map(l => l.content).join('; ')}
+      
+      请根据以上数据对我进行“复盘”。
+      如果我达标了，请大力夸奖我，并结合我的日志内容给一些具体的鼓励。
+      如果我不达标，请温柔地询问我是不是遇到了困难，或者是不是偷懒了，并给我一些心理安慰和今天的行动建议。
+      语气要像一个真诚的朋友或二次元导师。字数控制在150字以内。`;
+    }
+
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+      const text = data.candidates[0].content.parts[0].text;
+      setAiResponse(text);
+    } catch (error) {
+      setAiResponse("连接 AI 大脑失败... 请检查你的网络（梯子）或 API Key 是否正确。\n\nError: " + error.message);
+    } finally {
+      setAiThinking(false);
+    }
+  };
 
   // --- Handlers ---
   const handleTimerComplete = () => {
@@ -259,15 +331,11 @@ export default function LevelUpApp() {
     if (!document.fullscreenElement) {
       try {
         await appContainerRef.current.requestFullscreen();
-      } catch (err) {
-        // Silent fail
-      }
+      } catch (err) { }
     } else {
       try {
         if (document.exitFullscreen) await document.exitFullscreen();
-      } catch (err) {
-        // Silent fail
-      }
+      } catch (err) { }
     }
   };
 
@@ -359,27 +427,50 @@ export default function LevelUpApp() {
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
   return (
-    <div 
-      ref={appContainerRef} 
-      className={`h-[100dvh] w-full bg-black text-gray-100 font-sans flex flex-col md:flex-row overflow-hidden transition-all duration-500 overscroll-none`}
-    >
-      {/* Sidebar: Mobile Collapsible / Desktop Fixed */}
+    <div ref={appContainerRef} className={`h-[100dvh] w-full bg-black text-gray-100 font-sans flex flex-col md:flex-row overflow-hidden transition-all duration-500 overscroll-none`}>
+      
+      {/* Sidebar */}
       <div className={`${isZen ? 'hidden' : 'flex'} flex-col w-full md:w-96 bg-gray-900/90 border-b md:border-b-0 md:border-r border-gray-800 p-4 md:p-6 gap-4 md:gap-6 overflow-y-auto z-20 shadow-2xl flex-shrink-0 h-1/3 md:h-full`}>
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">LEVEL UP!</h1>
-            <p className="text-[10px] text-gray-500 font-mono mt-1">PRO EDITION: 400+ TARGET</p>
+            <p className="text-[10px] text-gray-500 font-mono mt-1">AI COACH EDITION</p>
           </div>
           <button onClick={() => setShowSettings(!showSettings)} className="text-gray-500 hover:text-white transition"><Settings className="w-5 h-5" /></button>
         </div>
 
+        {/* AI Coach Button */}
+        <button 
+          onClick={callAICoach}
+          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02]"
+        >
+          <Sparkles className="w-5 h-5" /> 召唤 AI 昨夜复盘
+        </button>
+
         {showSettings && (
-          <div className="bg-gray-800 rounded-lg p-3 text-xs animate-in fade-in slide-in-from-top-2">
-            <h3 className="text-gray-400 font-bold mb-2">数据备份</h3>
-            <div className="flex gap-2">
-              <button onClick={handleExportData} className="flex-1 bg-gray-700 hover:bg-gray-600 p-2 rounded flex items-center justify-center gap-1 transition"><Download className="w-3 h-3" /> 导出</button>
-              <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-gray-700 hover:bg-gray-600 p-2 rounded flex items-center justify-center gap-1 transition"><Upload className="w-3 h-3" /> 导入</button>
-              <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
+          <div className="bg-gray-800 rounded-lg p-4 text-xs animate-in fade-in slide-in-from-top-2 space-y-4">
+            <div>
+              <h3 className="text-gray-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit className="w-4 h-4"/> AI 设置 (Google Gemini)</h3>
+              <input 
+                type="password" 
+                placeholder="在此粘贴 API Key..." 
+                value={apiKey}
+                onChange={(e) => saveApiKey(e.target.value)}
+                className="w-full bg-black/50 border border-gray-600 rounded p-2 text-white mb-1 focus:border-purple-500 outline-none"
+              />
+              <p className="text-gray-500 text-[10px]">
+                * Key 仅保存在本地浏览器，不会上传。请使用支持 Google 的网络。
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-purple-400 underline ml-1">免费获取 Key</a>
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-gray-400 font-bold mb-2">数据备份</h3>
+              <div className="flex gap-2">
+                <button onClick={handleExportData} className="flex-1 bg-gray-700 hover:bg-gray-600 p-2 rounded flex items-center justify-center gap-1"><Download className="w-3 h-3" /> 导出</button>
+                <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-gray-700 hover:bg-gray-600 p-2 rounded flex items-center justify-center gap-1"><Upload className="w-3 h-3" /> 导入</button>
+                <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
+              </div>
             </div>
           </div>
         )}
@@ -401,20 +492,6 @@ export default function LevelUpApp() {
           </div>
         </div>
 
-        <div className="bg-gray-800/50 rounded-xl p-3 md:p-4 border border-gray-700 flex-shrink-0">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-gray-900/50 p-2 md:p-3 rounded-lg border border-gray-800">
-              <div className="text-xs text-gray-500 mb-1">有效投入</div>
-              <div className="text-lg font-mono font-bold text-white">{Math.floor(todayStats.studyMinutes / 60)}<span className="text-xs text-gray-500">h</span> {todayStats.studyMinutes % 60}<span className="text-xs text-gray-500">m</span></div>
-            </div>
-            <div className="bg-gray-900/50 p-2 md:p-3 rounded-lg border border-gray-800 relative overflow-hidden">
-               {todayStats.gameBank > 90 && <div className="absolute inset-0 bg-red-500/10 animate-pulse"></div>}
-              <div className="text-xs text-gray-500 mb-1">游戏券</div>
-              <div className={`text-lg font-mono font-bold ${todayStats.gameBank > 0 ? 'text-purple-400' : 'text-red-500'}`}>{todayStats.gameBank}<span className="text-xs text-gray-500">m</span></div>
-            </div>
-          </div>
-        </div>
-
         <div className="flex-1 overflow-y-auto min-h-0">
           <h2 className="text-sm font-semibold text-gray-400 mb-2 flex items-center gap-2"><History className="w-4 h-4" /> 战斗日志</h2>
           <div className="space-y-2 pr-1">
@@ -430,7 +507,6 @@ export default function LevelUpApp() {
 
       {/* Main Timer Area */}
       <div className={`flex-1 flex flex-col items-center justify-center p-4 relative bg-gradient-to-br ${getBgColor()} transition-colors duration-1000 overflow-hidden`}>
-        
         {/* Fullscreen Toggle */}
         <div className={`absolute top-4 right-4 z-30 transition-opacity duration-300 ${isZen && isActive ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}>
            {isZen && <button onClick={() => setIsZen(false)} className="mr-2 bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white px-3 py-2 rounded text-xs transition backdrop-blur-md">退出禅模式</button>}
@@ -444,27 +520,16 @@ export default function LevelUpApp() {
           <button onClick={() => switchMode('gaming')} className={`flex items-center gap-2 px-3 md:px-6 py-2 md:py-3 rounded-xl text-xs md:text-sm font-bold transition-all ${mode === 'gaming' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50 scale-105' : 'text-gray-400'}`}><Gamepad2 className="w-4 h-4" /> <span className="hidden md:inline">奖励</span></button>
         </div>
 
-        {/* Timer Circle - Responsive Vmin Sizing */}
+        {/* Timer Circle */}
         <div className={`relative mb-8 md:mb-12 group transition-all duration-700 ease-in-out ${isZen ? 'scale-125 md:scale-150' : 'scale-100'}`}>
           {!isZen && (<><div className={`absolute inset-0 rounded-full border-4 border-gray-800/50 scale-110`}></div><div className={`absolute inset-0 rounded-full border-4 opacity-20 blur-md transition-all duration-500 ${getThemeColor().split(' ')[0].replace('text', 'border')}`}></div></>)}
-          
-          <div className={`
-             rounded-full flex items-center justify-center relative transition-all duration-500 shadow-2xl
-             ${isZen ? 'border-0' : `border-8 bg-gray-900 ${getThemeColor()}`}
-          `}
-          style={{
-            width: 'min(70vmin, 320px)', 
-            height: 'min(70vmin, 320px)'
-          }}
-          >
+          <div className={`rounded-full flex items-center justify-center relative transition-all duration-500 shadow-2xl ${isZen ? 'border-0' : `border-8 bg-gray-900 ${getThemeColor()}`}`} style={{ width: 'min(70vmin, 320px)', height: 'min(70vmin, 320px)' }}>
              <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
                {!isZen && <circle cx="50" cy="50" r="44" fill="none" stroke="#1f2937" strokeWidth="4" />}
                <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth={isZen ? "2" : "4"} strokeLinecap="round" strokeDasharray="276" strokeDashoffset={276 - (276 * progress) / 100} className={`transition-all duration-1000 ease-linear ${isZen ? 'text-white/20' : ''}`}/>
              </svg>
              <div className="flex flex-col items-center z-10 select-none w-full">
-               <div className={`font-mono font-bold tabular-nums text-center whitespace-nowrap text-white drop-shadow-2xl transition-all duration-500 w-[5ch] ${isZen ? 'text-[15vmin]' : 'text-[12vmin] md:text-7xl'}`}>
-                 {formatTime(timeLeft)}
-               </div>
+               <div className={`font-mono font-bold tabular-nums text-center whitespace-nowrap text-white drop-shadow-2xl transition-all duration-500 w-[5ch] ${isZen ? 'text-[15vmin]' : 'text-[12vmin] md:text-7xl'}`}>{formatTime(timeLeft)}</div>
                <div className={`text-xs md:text-sm mt-2 md:mt-4 font-bold tracking-widest uppercase transition-all duration-500 ${mode === 'focus' ? 'text-emerald-400' : mode === 'break' ? 'text-blue-400' : 'text-purple-400'} ${isZen ? 'opacity-50' : 'opacity-100'}`}>{mode === 'focus' ? 'DEEP WORK' : mode === 'break' ? 'RECHARGE' : 'GAME ON'}</div>
              </div>
           </div>
@@ -494,6 +559,38 @@ export default function LevelUpApp() {
               <button onClick={cancelStopTimer} className="flex-1 bg-gray-800 text-white font-bold py-3 rounded-xl">继续坚持</button>
               <button onClick={confirmStopTimer} className="flex-1 bg-red-900/50 text-red-200 border border-red-800 font-bold py-3 rounded-xl">放弃</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Modal */}
+      {showAIModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-gray-900 border border-purple-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[80vh] overflow-y-auto relative">
+            <button onClick={() => setShowAIModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X className="w-5 h-5" /></button>
+            <div className="flex items-center gap-3 mb-6 text-purple-400">
+              <Sparkles className="w-8 h-8" />
+              <h3 className="text-xl font-bold text-white">AI 导师复盘</h3>
+            </div>
+            
+            {aiThinking ? (
+              <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-gray-400 text-sm animate-pulse">正在分析你的战斗数据...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
+                  <p className="text-gray-200 leading-relaxed whitespace-pre-wrap">{aiResponse}</p>
+                </div>
+                <button 
+                  onClick={() => setShowAIModal(false)}
+                  className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition-colors"
+                >
+                  收下建议，继续战斗！
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
