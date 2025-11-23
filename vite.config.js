@@ -7,9 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['icon.png'], // 确保包含你的本地图标
       manifest: {
-        // --- 1. 基础信息 (必填) ---
+        // --- 1. 基础信息 ---
         name: 'Level Up! 考研助手',
         short_name: 'LevelUp',
         description: 'Gamified Study Timer for Post-grad Entrance Exam',
@@ -17,40 +17,28 @@ export default defineConfig({
         background_color: '#000000',
         display: 'standalone',
         
-        // --- 2. 修复 ID 和 方向 (解决黄色警告) ---
+        // --- 2. 关键修复：ID 和 方向 ---
         id: '/', 
         start_url: '/',
-        orientation: 'portrait', // 强制竖屏
+        orientation: 'portrait',
         
-        // --- 3. 修复分类 (解决黄色警告) ---
-        categories: ['productivity', 'education'],
-
-        // --- 4. 修复图标 (使用 DiceBear 稳定源，解决 404 红色报错) ---
+        // --- 3. 关键修复：图标 (指向你 public 文件夹里的 icon.png) ---
         icons: [
           {
-            // 192x192 PNG
-            src: 'https://api.dicebear.com/9.x/initials/png?seed=LU&backgroundColor=000000&textColor=00ffcc&size=192',
+            src: '/icon.png', // 这里改成了本地路径
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any'
+            purpose: 'any maskable'
           },
           {
-            // 512x512 PNG
-            src: 'https://api.dicebear.com/9.x/initials/png?seed=LU&backgroundColor=000000&textColor=00ffcc&size=512',
+            src: '/icon.png', // 这里改成了本地路径
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any'
-          },
-          {
-            // 掩码图标 (安卓自适应图标)
-            src: 'https://api.dicebear.com/9.x/initials/png?seed=LU&backgroundColor=000000&textColor=00ffcc&size=512',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
+            purpose: 'any maskable'
           }
         ],
 
-        // --- 5. 修复截图 (使用 Unsplash 稳定图床) ---
+        // --- 4. 截图 (保留网络图以通过测试，以后你可以换成自己的) ---
         screenshots: [
           {
             src: "https://images.unsplash.com/photo-1616531770192-6eaea74c2456?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80",
@@ -67,12 +55,6 @@ export default defineConfig({
             label: "AI Chat"
           }
         ]
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        cleanupOutdatedCaches: true,
-        skipWaiting: true,
-        clientsClaim: true
       }
     })
   ],
