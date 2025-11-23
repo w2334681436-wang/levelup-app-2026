@@ -100,7 +100,6 @@ export default function LevelUpApp() {
   // --- LocalStorage Logic ---
   const loadData = () => {
     try {
-      // Load Today
       const todayStr = getTodayDateString();
       const storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
       setHistory(storedHistory);
