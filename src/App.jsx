@@ -19,7 +19,13 @@ const getYesterdayDateString = () => {
   return date.toISOString().split('T')[0];
 };
 
-// 根据月份判断考研阶段
+// 核心修复：清洗 AI 回复，去除 DeepSeek R1 的 <think> 标签
+const cleanAIResponse = (text) => {
+  if (!text) return '';
+  // 移除 <think>...</think> 及其中的内容，支持跨行
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+};
+
 const getStageInfo = () => {
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -185,7 +191,6 @@ export default function LevelUpApp() {
     setIsFetchingModels(true);
     try {
       const cleanBaseUrl = apiBaseUrl.replace(/\/$/, '');
-      // SiliconFlow 使用 /models，DeepSeek 可能略有不同，这里做通用尝试
       const response = await fetch(`${cleanBaseUrl}/models`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${apiKey}` }
@@ -231,8 +236,10 @@ export default function LevelUpApp() {
       if (!response.ok) throw new Error(data.error?.message || JSON.stringify(data));
 
       if (data.choices && data.choices.length > 0) {
-        const reply = data.choices[0].message.content;
-        setChatMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+        const rawReply = data.choices[0].message.content;
+        // 核心修复：清洗回复内容，移除 <think> 标签
+        const cleanReply = cleanAIResponse(rawReply);
+        setChatMessages(prev => [...prev, { role: 'assistant', content: cleanReply }]);
       }
     } catch (error) {
       setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ 连接失败: ${error.message}` }]);
@@ -253,21 +260,23 @@ export default function LevelUpApp() {
       const yesterdayStr = getYesterdayDateString();
       const yesterdayData = history.find(d => d.date === yesterdayStr);
       
-      let systemContext = `你是一位幽默、有时严厉但内心温暖的二次元风格考研导师。你的学生正在备考上海交大/中科大AI硕士（目标2026年）。
-      如果学生发表情包，你也请回复表情包。请用对话的形式与学生交流，不要一次性发长篇大论，要引导学生回复。
+      // 优化 Prompt：防止复读机，强调对话感
+      let systemContext = `你是一位幽默、温暖的二次元风格考研导师。学生目标：上海交大/中科大AI硕士(2026)。
       
-      昨天（${yesterdayStr}）数据：
+      昨日(${yesterdayStr})数据：
       `;
       
       if (!yesterdayData) {
-        systemContext += `学生没有记录任何数据。请直接发起对话，询问昨天去哪了，是不是偷懒了。`;
+        systemContext += `学生无记录。请直接调侃他是不是去拯救世界了，并催促今天开始努力。`;
       } else {
         const studyHours = (yesterdayData.studyMinutes / 60).toFixed(1);
-        systemContext += `有效学习${studyHours}小时，目标${stage.targetHours}小时，玩游戏${yesterdayData.gameUsed}分钟。日志：${yesterdayData.logs.map(l => typeof l.content === 'string' ? l.content : JSON.stringify(l)).join(';')}`;
+        systemContext += `学${studyHours}h (目标${stage.targetHours}h)，玩${yesterdayData.gameUsed}m。日志：${yesterdayData.logs.map(l => typeof l.content === 'string' ? l.content : JSON.stringify(l)).join(';')}`;
       }
 
+      systemContext += `\n\n要求：\n1. 不要重复上述数据给学生看，直接给出评价和建议。\n2. 语气像朋友聊天，简短有力，不要长篇大论。\n3. 鼓励使用表情包。`;
+
       const initialMsg = { role: 'system', content: systemContext };
-      const triggerMsg = { role: 'user', content: "导师，我来了，看看我昨天的情况。" };
+      const triggerMsg = { role: 'user', content: "导师，看看我昨天的情况！" };
       
       const newHistory = [initialMsg, triggerMsg];
       setChatMessages(newHistory); 
@@ -336,7 +345,9 @@ export default function LevelUpApp() {
 
   const toggleFullScreen = async () => {
     if (!appContainerRef.current) return;
+    
     const isFullscreenAvailable = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+    
     if (!isFullscreenAvailable) return;
 
     if (!document.fullscreenElement) {
@@ -399,7 +410,6 @@ export default function LevelUpApp() {
   const progress = ((initialTime - timeLeft) / initialTime) * 100;
   const dailyProgressPercent = Math.min((todayStats.studyMinutes / (stage.targetHours*60)) * 100, 100);
   
-  // 定义颜色辅助函数
   const getThemeColor = () => {
     if (mode === 'focus') return 'text-emerald-400 border-emerald-500 shadow-emerald-900/50';
     if (mode === 'break') return 'text-blue-400 border-blue-500 shadow-blue-900/50';
@@ -423,7 +433,8 @@ export default function LevelUpApp() {
     <div ref={appContainerRef} className={`h-[100dvh] w-full bg-[#0a0a0a] text-gray-100 font-sans flex flex-col md:flex-row overflow-hidden relative`}>
       {/* 背景纹理 */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(20,20,40,0.4),transparent_70%)] pointer-events-none"></div>
-      
+      <div className="absolute inset-0 opacity-5 pointer-events-none mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
+
       {/* Sidebar */}
       <div className={`${isZen ? 'hidden' : 'flex'} flex-col w-full md:w-96 bg-[#111116] border-b md:border-b-0 md:border-r border-gray-800 p-4 md:p-6 gap-4 overflow-y-auto z-20 shadow-2xl flex-shrink-0 h-1/3 md:h-full relative group`}>
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-purple-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
@@ -528,7 +539,7 @@ export default function LevelUpApp() {
         </div>
 
         <div className={`relative mb-8 group transition-all duration-1000 ${isZen ? 'scale-125 md:scale-150' : 'scale-100'}`}>
-          <div className={`rounded-full flex items-center justify-center relative shadow-[0_0_50px_-10px_currentColor] transition-all duration-1000 ${isZen ? '' : `border-8 bg-black/50 backdrop-blur-sm ${currentTheme.color.split(' ')[1]}`}`} style={{ width: 'min(70vmin, 320px)', height: 'min(70vmin, 320px)' }}>
+          <div className={`rounded-full flex items-center justify-center relative shadow-[0_0_50px_-10px_currentColor] transition-all duration-1000 ${isZen ? '' : `border-8 bg-black/50 backdrop-blur-sm ${currentTheme.color.split(' ')[1] /* Takes the border class */}`}`} style={{ width: 'min(70vmin, 320px)', height: 'min(70vmin, 320px)' }}>
              <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
                {!isZen && <circle cx="50" cy="50" r="44" fill="none" stroke="#222" strokeWidth="2" />}
                <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth={isZen ? "2" : "4"} strokeLinecap="round" strokeDasharray="276" strokeDashoffset={276 - (276 * progress) / 100} className={`transition-all duration-1000 ease-linear ${isZen ? 'text-white/30' : ''}`}/>
