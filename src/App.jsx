@@ -19,6 +19,7 @@ const getYesterdayDateString = () => {
   return date.toISOString().split('T')[0];
 };
 
+// 根据月份判断考研阶段
 const getStageInfo = () => {
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -106,7 +107,6 @@ export default function LevelUpApp() {
       const todayStr = getTodayDateString();
       const storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
       
-      // Load AI Settings
       const storedKey = localStorage.getItem('ai_api_key') || '';
       const storedBaseUrl = localStorage.getItem('ai_base_url') || 'https://api.siliconflow.cn/v1';
       const storedModel = localStorage.getItem('ai_model') || 'deepseek-ai/DeepSeek-R1';
@@ -289,7 +289,7 @@ export default function LevelUpApp() {
     setChatInput(prev => prev + emoji);
   };
 
-  // --- 8. 状态更新辅助函数 (Move these BEFORE they are used) ---
+  // --- 8. 状态更新辅助函数 ---
   const updateStudyStats = (seconds, log) => {
     const m = Math.floor(seconds / 60);
     const g = Math.floor(m / 4.5); 
@@ -336,10 +336,7 @@ export default function LevelUpApp() {
 
   const toggleFullScreen = async () => {
     if (!appContainerRef.current) return;
-    
-    // Safely check for fullscreen capability
     const isFullscreenAvailable = document.fullscreenEnabled || document.webkitFullscreenEnabled;
-    
     if (!isFullscreenAvailable) return;
 
     if (!document.fullscreenElement) {
@@ -384,18 +381,9 @@ export default function LevelUpApp() {
   };
 
   const triggerStopTimer = () => setShowStopModal(true);
-  
-  const confirmStopTimer = () => { 
-    setShowStopModal(false); 
-    setIsActive(false); 
-    setIsZen(false); 
-    setTimeLeft(initialTime); 
-    if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); 
-    if(mode==='gaming') updateGameStats(initialTime-timeLeft); 
-  };
-  
+  const confirmStopTimer = () => { setShowStopModal(false); setIsActive(false); setIsZen(false); setTimeLeft(initialTime); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); if(mode==='gaming') updateGameStats(initialTime-timeLeft); };
   const cancelStopTimer = () => setShowStopModal(false);
-
+  
   const handleExportData = () => {
     const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history));
     const a = document.createElement('a'); a.href = str; a.download = `LevelUp_Backup_${getTodayDateString()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -411,7 +399,7 @@ export default function LevelUpApp() {
   const progress = ((initialTime - timeLeft) / initialTime) * 100;
   const dailyProgressPercent = Math.min((todayStats.studyMinutes / (stage.targetHours*60)) * 100, 100);
   
-  // Fix: Define getThemeColor and getBgColor properly
+  // 定义颜色辅助函数
   const getThemeColor = () => {
     if (mode === 'focus') return 'text-emerald-400 border-emerald-500 shadow-emerald-900/50';
     if (mode === 'break') return 'text-blue-400 border-blue-500 shadow-blue-900/50';
@@ -424,10 +412,8 @@ export default function LevelUpApp() {
      if (mode === 'gaming') return 'from-purple-950/90 to-black';
   };
 
-  // Ensure currentTheme objects are valid and accessible
   const currentTheme = {
     color: getThemeColor(),
-    // 额外的样式对象
     textColor: mode === 'focus' ? 'text-emerald-400' : mode === 'break' ? 'text-blue-400' : 'text-purple-400'
   };
 
