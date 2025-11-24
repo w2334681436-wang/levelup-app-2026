@@ -1,8 +1,66 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Square, RotateCcw, Gamepad2, BookOpen, Coffee, Save, History, Trophy, AlertCircle, X, CheckCircle2, Download, Upload, Settings, Target, Maximize2, Minimize2, AlertTriangle, Sparkles, BrainCircuit, Server, Cpu, RefreshCw, List, Send, Smile, Search, ChevronDown, Zap, MessageCircle } from 'lucide-react';
+import { 
+  Play, Pause, Square, RotateCcw, Gamepad2, BookOpen, Coffee, Save, 
+  History, Trophy, AlertCircle, X, CheckCircle2, Download, Upload, 
+  Settings, Target, Maximize2, Minimize2, AlertTriangle, Sparkles, 
+  BrainCircuit, Server, Cpu, RefreshCw, List, Send, Smile, Search, 
+  ChevronDown, Zap, MessageCircle, User, Info, Bell, PlusCircle, Clock,
+  Home,
+  BarChart3
+} from 'lucide-react';
 
-// --- 1. 工具函数 (Utility Functions) ---
+// --- 1. 组件：自定义通知 (Toast) ---
+const Toast = ({ notifications, removeNotification }) => {
+  return (
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none">
+      {notifications.map((note) => (
+        <div 
+          key={note.id} 
+          className={`
+            pointer-events-auto flex items-center gap-3 p-4 rounded-xl shadow-2xl border backdrop-blur-md animate-in slide-in-from-top-2 fade-in
+            ${note.type === 'error' ? 'bg-red-950/80 border-red-500/50 text-red-200' : 
+              note.type === 'success' ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200' : 
+              'bg-gray-900/80 border-gray-700 text-gray-200'}
+          `}
+        >
+          {note.type === 'error' ? <AlertCircle className="w-5 h-5 flex-shrink-0" /> : 
+           note.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" /> : 
+           <Info className="w-5 h-5 flex-shrink-0" />}
+          <p className="text-sm font-medium">{note.message}</p>
+          <button onClick={() => removeNotification(note.id)} className="ml-auto hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// --- 2. 组件：通用确认框 (Confirm Modal) ---
+const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, confirmText = "确定", cancelText = "取消", isDangerous = false }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform transition-all scale-100">
+        <div className={`flex items-center gap-3 mb-4 ${isDangerous ? 'text-red-500' : 'text-blue-500'}`}>
+          {isDangerous ? <AlertTriangle className="w-6 h-6" /> : <Info className="w-6 h-6" />}
+          <h3 className="text-lg font-bold text-white">{title}</h3>
+        </div>
+        <p className="text-gray-300 text-sm mb-6 leading-relaxed">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-2.5 rounded-lg transition-colors">
+            {cancelText}
+          </button>
+          <button onClick={onConfirm} className={`flex-1 font-bold py-2.5 rounded-lg transition-colors ${isDangerous ? 'bg-red-900/50 hover:bg-red-800 text-red-100 border border-red-800' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- 3. 工具函数 ---
 const formatTime = (seconds) => {
+  if (seconds < 0) return "00:00";
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
@@ -19,10 +77,8 @@ const getYesterdayDateString = () => {
   return date.toISOString().split('T')[0];
 };
 
-// 核心修复：清洗 AI 回复，去除 DeepSeek R1 的 <think> 标签
 const cleanAIResponse = (text) => {
   if (!text) return '';
-  // 移除 <think>...</think> 及其中的内容，支持跨行
   return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 };
 
@@ -47,7 +103,6 @@ const getStageInfo = () => {
   }
 };
 
-// --- 2. 预设数据 (Presets) ---
 const API_PROVIDERS = [
   { id: 'siliconflow', name: '硅基流动 (SiliconFlow)', url: 'https://api.siliconflow.cn/v1', defaultModel: 'deepseek-ai/DeepSeek-R1' },
   { id: 'deepseek', name: 'DeepSeek 官方', url: 'https://api.deepseek.com', defaultModel: 'deepseek-chat' },
@@ -59,106 +114,236 @@ const API_PROVIDERS = [
 
 const COMMON_EMOJIS = ['👍', '🔥', '💪', '😭', '🙏', '🎉', '🤔', '💤', '📚', '☕️', '🤖', '👻'];
 
-// --- 3. 主组件 (Main Component) ---
+// 默认人设
+const DEFAULT_PERSONA = "你是一位幽默、温暖的二次元风格考研导师。说话请尽量简短有趣，多用emoji，不要长篇大论。";
+
+// 移动端底部导航组件
+const MobileNav = ({ 
+  mode, 
+  switchMode, 
+  startAICoach, 
+  showSettings, 
+  setShowSettings, 
+  todayStats, 
+  activeView, 
+  setActiveView,
+  openManualLog
+}) => {
+  return (
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#111116] border-t border-gray-800 p-2 z-50">
+      <div className="flex justify-around items-center">
+        <button 
+          onClick={() => setActiveView('timer')}
+          className={`flex flex-col items-center p-2 rounded-lg ${activeView === 'timer' ? 'text-cyan-400 bg-cyan-500/20' : 'text-gray-400'}`}
+        >
+          <Home className="w-5 h-5" />
+          <span className="text-xs mt-1">主页</span>
+        </button>
+        
+        <button 
+          onClick={() => setActiveView('stats')}
+          className={`flex flex-col items-center p-2 rounded-lg ${activeView === 'stats' ? 'text-emerald-400 bg-emerald-500/20' : 'text-gray-400'}`}
+        >
+          <BarChart3 className="w-5 h-5" />
+          <span className="text-xs mt-1">数据</span>
+        </button>
+        
+        <button 
+          onClick={openManualLog}
+          className="flex flex-col items-center p-2 rounded-lg text-gray-400 hover:text-emerald-400"
+        >
+          <PlusCircle className="w-5 h-5" />
+          <span className="text-xs mt-1">补录</span>
+        </button>
+        
+        <button 
+          onClick={startAICoach}
+          className="flex flex-col items-center p-2 rounded-lg text-gray-400 hover:text-purple-400 relative"
+        >
+          <MessageCircle className="w-5 h-5" />
+          <span className="text-xs mt-1">AI导师</span>
+        </button>
+        
+        <button 
+          onClick={() => setShowSettings(!showSettings)}
+          className="flex flex-col items-center p-2 rounded-lg text-gray-400 hover:text-white"
+        >
+          <Settings className="w-5 h-5" />
+          <span className="text-xs mt-1">设置</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// --- 4. 主组件 ---
 export default function LevelUpApp() {
   const [loading, setLoading] = useState(true);
   
-  // 3.1 计时器状态
+  // 核心状态
   const [mode, setMode] = useState('focus'); 
   const [timeLeft, setTimeLeft] = useState(45 * 60);
   const [isActive, setIsActive] = useState(false);
   const [initialTime, setInitialTime] = useState(45 * 60);
   const [stage, setStage] = useState(getStageInfo());
   const [isZen, setIsZen] = useState(false);
+  const [customTargetHours, setCustomTargetHours] = useState(null); // 自定义目标时长
+  const [activeView, setActiveView] = useState('timer'); // 移动端视图状态
   
-  // 3.2 数据状态
+  // 数据状态
   const [todayStats, setTodayStats] = useState({ studyMinutes: 0, gameBank: 0, gameUsed: 0, logs: [] });
   const [history, setHistory] = useState([]);
   
-  // 3.3 AI 设置状态
+  // AI 设置状态
   const [apiKey, setApiKey] = useState(''); 
   const [apiBaseUrl, setApiBaseUrl] = useState('https://api.siliconflow.cn/v1'); 
   const [apiModel, setApiModel] = useState('deepseek-ai/DeepSeek-R1');
   const [selectedProvider, setSelectedProvider] = useState('siliconflow');
+  const [customPersona, setCustomPersona] = useState(''); // 自定义人设
   
-  // 3.4 模型列表状态
   const [availableModels, setAvailableModels] = useState([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [isModelListOpen, setIsModelListOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   
-  // 3.5 聊天状态
+  // 聊天状态
   const [chatMessages, setChatMessages] = useState([]); 
   const [chatInput, setChatInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [aiThinking, setAiThinking] = useState(false);
   const chatEndRef = useRef(null);
 
-  // 3.6 UI 状态
+  // 界面模态框状态
   const [showLogModal, setShowLogModal] = useState(false);
+  const [isManualLog, setIsManualLog] = useState(false); // 是否为手动补录
+  const [manualDuration, setManualDuration] = useState(45); // 手动补录时长
   const [showStopModal, setShowStopModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false); 
+  const [showSettings, setShowSettings] = useState(false);
   const [logContent, setLogContent] = useState('');
   const [pendingStudyTime, setPendingStudyTime] = useState(0); 
-  const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  
+
+  // 通知与确认框状态
+  const [notifications, setNotifications] = useState([]);
+  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDangerous: false });
+  const [pendingImportData, setPendingImportData] = useState(null);
+
   const fileInputRef = useRef(null);
   const timerRef = useRef(null);
   const appContainerRef = useRef(null);
 
-  // --- 4. 数据加载与保存逻辑 (LocalStorage) ---
+  // --- 通知系统逻辑 ---
+  const addNotification = (message, type = 'info') => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 4000);
+  };
+
+  const removeNotification = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const closeConfirm = () => {
+    setConfirmState(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // --- 数据加载与保存 ---
   const loadData = () => {
     try {
       const todayStr = getTodayDateString();
-      const storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
+      const storedHistoryText = localStorage.getItem('levelup_history');
+      let storedHistory = [];
+      
+      if (storedHistoryText) {
+        try {
+          storedHistory = JSON.parse(storedHistoryText);
+          if (!Array.isArray(storedHistory)) storedHistory = [];
+        } catch (e) {
+          console.error("JSON Parse Error", e);
+          storedHistory = [];
+        }
+      }
       
       const storedKey = localStorage.getItem('ai_api_key') || '';
       const storedBaseUrl = localStorage.getItem('ai_base_url') || 'https://api.siliconflow.cn/v1';
       const storedModel = localStorage.getItem('ai_model') || 'deepseek-ai/DeepSeek-R1';
       const storedProvider = localStorage.getItem('ai_provider') || 'siliconflow';
+      const storedPersona = localStorage.getItem('ai_persona') || '';
+      const storedTargetHours = localStorage.getItem('target_hours') ? parseFloat(localStorage.getItem('target_hours')) : null;
+
       const storedModelList = JSON.parse(localStorage.getItem('ai_model_list') || '[]');
-      
+      const storedChat = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
+
       setHistory(storedHistory);
       setApiKey(storedKey);
       setApiBaseUrl(storedBaseUrl);
       setApiModel(storedModel);
       setSelectedProvider(storedProvider);
+      setCustomPersona(storedPersona);
+      setCustomTargetHours(storedTargetHours);
+
       setAvailableModels(storedModelList);
+      setChatMessages(storedChat);
 
       const todayData = storedHistory.find(d => d.date === todayStr);
       if (todayData) {
         setTodayStats(todayData);
       } else {
         let lastBank = 0;
-        if (storedHistory.length > 0) lastBank = storedHistory[0].gameBank;
+        if (storedHistory.length > 0) lastBank = storedHistory[0].gameBank || 0;
         setTodayStats({ date: todayStr, studyMinutes: 0, gameBank: lastBank > 0 ? lastBank : 0, gameUsed: 0, logs: [] });
       }
-    } catch (e) { console.error("Load Error", e); }
+    } catch (e) { 
+      console.error("Load Error", e); 
+      addNotification("数据加载遇到一些小问题，已重置为安全状态。", "error");
+    }
     setLoading(false);
   };
 
   const saveData = (newTodayStats) => {
     try {
       const todayStr = getTodayDateString();
-      let storedHistory = JSON.parse(localStorage.getItem('levelup_history') || '[]');
+      let storedHistory = [...history]; // Copy array
       storedHistory = storedHistory.filter(d => d.date !== todayStr);
       storedHistory.unshift(newTodayStats);
       storedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
       localStorage.setItem('levelup_history', JSON.stringify(storedHistory));
       setTodayStats(newTodayStats);
       setHistory(storedHistory);
-    } catch (e) { console.error("Save Error", e); }
+    } catch (e) { 
+      console.error("Save Error", e);
+      addNotification("保存数据失败，可能是存储空间已满。", "error");
+    }
   };
 
-  const saveAISettings = (key, baseUrl, model, provider, modelList = availableModels) => {
-    setApiKey(key); setApiBaseUrl(baseUrl); setApiModel(model); setSelectedProvider(provider); setAvailableModels(modelList);
+  const saveAISettings = (key, baseUrl, model, provider, persona, modelList = availableModels) => {
+    setApiKey(key); setApiBaseUrl(baseUrl); setApiModel(model); setSelectedProvider(provider); setCustomPersona(persona); setAvailableModels(modelList);
     localStorage.setItem('ai_api_key', key);
     localStorage.setItem('ai_base_url', baseUrl);
     localStorage.setItem('ai_model', model);
     localStorage.setItem('ai_provider', provider);
+    localStorage.setItem('ai_persona', persona);
     localStorage.setItem('ai_model_list', JSON.stringify(modelList));
   };
+
+  const saveTargetHours = (hours) => {
+    setCustomTargetHours(hours);
+    if (hours) {
+      localStorage.setItem('target_hours', hours);
+    } else {
+      localStorage.removeItem('target_hours');
+    }
+  }
+
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      const recent = chatMessages.slice(-50);
+      localStorage.setItem('ai_chat_history', JSON.stringify(recent));
+    }
+  }, [chatMessages]);
 
   useEffect(() => { loadData(); }, []);
   
@@ -166,28 +351,217 @@ export default function LevelUpApp() {
     if (showChatModal) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [chatMessages, showChatModal]);
+  }, [chatMessages, showChatModal, aiThinking]);
 
-  // --- 5. 计时器核心逻辑 ---
   useEffect(() => {
     if (isActive && timeLeft > 0) {
-      timerRef.current = setInterval(() => { setTimeLeft((prev) => prev - 1); }, 1000);
-    } else if (timeLeft === 0 && isActive) {
+      timerRef.current = setInterval(() => { setTimeLeft((prev) => Math.max(0, prev - 1)); }, 1000);
+    } else if (timeLeft <= 0 && isActive) {
       handleTimerComplete();
     }
     return () => clearInterval(timerRef.current);
   }, [isActive, timeLeft]);
 
-  // --- 6. 监听全屏变化 ---
   useEffect(() => {
     const handleFsChange = () => { setIsFullscreen(!!document.fullscreenElement); };
     document.addEventListener("fullscreenchange", handleFsChange);
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
-  // --- 7. AI 交互逻辑 ---
+  // --- 逻辑处理 ---
+  const updateStudyStats = (seconds, log) => {
+    const m = Math.floor(seconds / 60);
+    const g = Math.floor(m / 4.5); 
+    saveData({ ...todayStats, studyMinutes: todayStats.studyMinutes + m, gameBank: todayStats.gameBank + g, logs: [...todayStats.logs, { time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}), content: log, duration: m }] });
+  };
+
+  const updateGameStats = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    saveData({ ...todayStats, gameUsed: todayStats.gameUsed + m, gameBank: Math.max(0, todayStats.gameBank - m) });
+  };
+
+  const switchMode = (newMode) => {
+    setIsActive(false);
+    setIsZen(false);
+    
+    if (newMode === 'gaming') {
+      if (todayStats.gameBank <= 0) {
+        addNotification("⛔ 你的游戏券余额为0！请先去专注学习！", "error");
+        setMode('focus');
+        setInitialTime(45 * 60);
+        setTimeLeft(45 * 60);
+        return;
+      }
+      const availableSeconds = todayStats.gameBank * 60;
+      setMode(newMode);
+      setInitialTime(availableSeconds);
+      setTimeLeft(availableSeconds);
+    } else {
+      setMode(newMode);
+      if (newMode === 'focus') {
+        setInitialTime(45 * 60);
+        setTimeLeft(45 * 60);
+      } else if (newMode === 'break') {
+        setInitialTime(10 * 60); 
+        setTimeLeft(10 * 60);
+      }
+    }
+  };
+
+  // 打开手动打卡
+  const openManualLog = () => {
+    setIsManualLog(true);
+    setManualDuration(45); // 默认补录45分钟
+    setLogContent('');
+    setShowLogModal(true);
+  };
+
+  const saveLog = () => { 
+    if(logContent.trim()){ 
+      const durationToSave = isManualLog ? (manualDuration * 60) : pendingStudyTime;
+      
+      updateStudyStats(durationToSave, logContent); 
+      setShowLogModal(false); 
+      setLogContent(''); 
+      setIsManualLog(false);
+      
+      if (isManualLog) {
+          addNotification(`成功补录 ${manualDuration} 分钟学习记录！`, "success");
+      } else {
+          addNotification("学习记录已保存，休息一下吧！", "success");
+          switchMode('break'); 
+      }
+    }
+  };
+
+  const handleTimerComplete = () => {
+    setIsActive(false); 
+    setIsZen(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    clearInterval(timerRef.current);
+    
+    if (mode === 'focus') {
+      setPendingStudyTime(initialTime); 
+      setIsManualLog(false); // 确保不是手动模式
+      setShowLogModal(true);
+      // Play sound here if desired
+    } else if (mode === 'gaming') {
+      updateGameStats(initialTime); 
+      addNotification("⚠️ 游戏时间耗尽！该回去学习了！", "error");
+      switchMode('focus');
+    } else { 
+      addNotification("🔔 休息结束！开始专注吧。", "info");
+      switchMode('focus');
+    }
+  };
+
+  const toggleFullScreen = async () => {
+    if (!appContainerRef.current) return;
+    const isFullscreenAvailable = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+    if (!isFullscreenAvailable) {
+      addNotification("您的浏览器不支持全屏模式", "error");
+      return;
+    }
+
+    if (!document.fullscreenElement) {
+      try {
+        await appContainerRef.current.requestFullscreen();
+      } catch (err) { console.log("Fullscr err", err); }
+    } else {
+      try {
+        if (document.exitFullscreen) await document.exitFullscreen();
+      } catch (err) { console.log("Exit Fullscr err", err); }
+    }
+  };
+
+  const toggleTimer = () => {
+    if (mode === 'gaming' && todayStats.gameBank <= 0 && !isActive) {
+      addNotification("余额不足，无法开始游戏！", "error");
+      return;
+    }
+    if (!isActive) {
+      setIsActive(true);
+      if (mode === 'focus') {
+        setIsZen(true);
+        if (appContainerRef.current && document.fullscreenEnabled) {
+             // 自动全屏可选，这里保留逻辑但增加catch
+            appContainerRef.current.requestFullscreen().catch(() => {});
+        }
+      }
+    } else {
+      setIsActive(false);
+    }
+  };
+
+  const triggerStopTimer = () => setShowStopModal(true);
+  
+  const confirmStopTimer = () => { 
+    setShowStopModal(false); 
+    setIsActive(false); 
+    setIsZen(false); 
+    setTimeLeft(initialTime); 
+    if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); 
+    if(mode==='gaming') updateGameStats(initialTime-timeLeft); 
+    addNotification("计时已取消", "info");
+  };
+  
+  const cancelStopTimer = () => setShowStopModal(false);
+
+  const handleExportData = () => {
+    try {
+      const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history));
+      const a = document.createElement('a'); 
+      a.href = str; 
+      a.download = `LevelUp_Backup_${getTodayDateString()}.json`; 
+      document.body.appendChild(a); 
+      a.click(); 
+      document.body.removeChild(a);
+      addNotification("数据导出成功！", "success");
+    } catch(err) {
+      addNotification("导出失败，请重试。", "error");
+    }
+  };
+  
+  const handleImportData = (e) => {
+    const f = e.target.files[0]; 
+    if(!f) return; 
+    
+    const r = new FileReader();
+    r.onload = (ev) => { 
+      try { 
+        const d = JSON.parse(ev.target.result); 
+        if (Array.isArray(d)) {
+          setPendingImportData(d);
+          setConfirmState({
+            isOpen: true,
+            title: "导入备份",
+            message: `解析到 ${d.length} 条记录。导入将覆盖当前的历史记录，确定继续吗？`,
+            onConfirm: () => confirmImportData(d),
+            isDangerous: true,
+            confirmText: "覆盖并导入"
+          });
+        } else {
+          addNotification("文件格式错误：必须是数组格式的 JSON。", "error");
+        }
+      } catch(err){
+        addNotification("文件解析失败，请检查文件是否损坏。", "error");
+      } 
+    };
+    r.readAsText(f);
+    // 重置 input 以便允许再次导入相同文件
+    e.target.value = '';
+  };
+
+  const confirmImportData = (data) => {
+    localStorage.setItem('levelup_history', JSON.stringify(data));
+    loadData();
+    closeConfirm();
+    addNotification("数据导入成功！", "success");
+    setPendingImportData(null);
+  };
+
   const fetchAvailableModels = async () => {
-    if (!apiKey) return alert("请先输入 API Key！");
+    if (!apiKey) return addNotification("请先输入 API Key！", "error");
     setIsFetchingModels(true);
     try {
       const cleanBaseUrl = apiBaseUrl.replace(/\/$/, '');
@@ -200,13 +574,14 @@ export default function LevelUpApp() {
       if (data.data && Array.isArray(data.data)) {
         const models = data.data.map(m => m.id).sort();
         setAvailableModels(models);
-        saveAISettings(apiKey, apiBaseUrl, apiModel, selectedProvider, models);
+        saveAISettings(apiKey, apiBaseUrl, apiModel, selectedProvider, customPersona, models);
         setIsModelListOpen(true); 
+        addNotification(`成功获取 ${models.length} 个模型`, "success");
       } else {
-        alert("获取成功，但返回格式无法解析。");
+        addNotification("获取成功，但返回格式无法解析。", "error");
       }
     } catch (error) {
-      alert(`获取失败: ${error.message}\n请检查 Base URL 是否正确。`);
+      addNotification(`获取失败: ${error.message}`, "error");
     } finally {
       setIsFetchingModels(false);
     }
@@ -237,7 +612,6 @@ export default function LevelUpApp() {
 
       if (data.choices && data.choices.length > 0) {
         const rawReply = data.choices[0].message.content;
-        // 核心修复：清洗回复内容，移除 <think> 标签
         const cleanReply = cleanAIResponse(rawReply);
         setChatMessages(prev => [...prev, { role: 'assistant', content: cleanReply }]);
       }
@@ -250,7 +624,7 @@ export default function LevelUpApp() {
 
   const startAICoach = () => {
     if (!apiKey) {
-      alert("请先在设置中输入 API Key！");
+      addNotification("请先在设置中输入 API Key！", "error");
       setShowSettings(true);
       return;
     }
@@ -260,20 +634,18 @@ export default function LevelUpApp() {
       const yesterdayStr = getYesterdayDateString();
       const yesterdayData = history.find(d => d.date === yesterdayStr);
       
-      // 优化 Prompt：防止复读机，强调对话感
-      let systemContext = `你是一位幽默、温暖的二次元风格考研导师。学生目标：上海交大/中科大AI硕士(2026)。
-      
-      昨日(${yesterdayStr})数据：
-      `;
+      // 使用自定义人设或默认人设
+      const persona = customPersona.trim() || DEFAULT_PERSONA;
+      const target = customTargetHours || stage.targetHours;
+
+      let systemContext = `${persona}\n\n学生目标：上海交大/中科大AI硕士(2026)。\n\n昨日(${yesterdayStr})数据：`;
       
       if (!yesterdayData) {
-        systemContext += `学生无记录。请直接调侃他是不是去拯救世界了，并催促今天开始努力。`;
+        systemContext += `学生无记录。请根据你的人设催促他开始努力。`;
       } else {
         const studyHours = (yesterdayData.studyMinutes / 60).toFixed(1);
-        systemContext += `学${studyHours}h (目标${stage.targetHours}h)，玩${yesterdayData.gameUsed}m。日志：${yesterdayData.logs.map(l => typeof l.content === 'string' ? l.content : JSON.stringify(l)).join(';')}`;
+        systemContext += `学${studyHours}h (目标${target}h)，玩${yesterdayData.gameUsed}m。日志：${yesterdayData.logs.map(l => typeof l.content === 'string' ? l.content : JSON.stringify(l)).join(';')}`;
       }
-
-      systemContext += `\n\n要求：\n1. 不要重复上述数据给学生看，直接给出评价和建议。\n2. 语气像朋友聊天，简短有力，不要长篇大论。\n3. 鼓励使用表情包。`;
 
       const initialMsg = { role: 'system', content: systemContext };
       const triggerMsg = { role: 'user', content: "导师，看看我昨天的情况！" };
@@ -298,118 +670,12 @@ export default function LevelUpApp() {
     setChatInput(prev => prev + emoji);
   };
 
-  // --- 8. 状态更新辅助函数 ---
-  const updateStudyStats = (seconds, log) => {
-    const m = Math.floor(seconds / 60);
-    const g = Math.floor(m / 4.5); 
-    saveData({ ...todayStats, studyMinutes: todayStats.studyMinutes + m, gameBank: todayStats.gameBank + g, logs: [...todayStats.logs, { time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}), content: log, duration: m }] });
-  };
+  // --- 变量计算 (Render Before Return) ---
+  const progress = initialTime > 0 ? ((initialTime - timeLeft) / initialTime) * 100 : 0;
+  // 优先使用自定义目标时间
+  const currentTargetHours = customTargetHours || stage.targetHours;
+  const dailyProgressPercent = currentTargetHours > 0 ? Math.min((todayStats.studyMinutes / (currentTargetHours*60)) * 100, 100) : 0;
 
-  const updateGameStats = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    saveData({ ...todayStats, gameUsed: todayStats.gameUsed + m, gameBank: todayStats.gameBank - m });
-  };
-
-  const saveLog = () => { 
-    if(logContent.trim()){ 
-      updateStudyStats(pendingStudyTime, logContent); 
-      setShowLogModal(false); 
-      setLogContent(''); 
-      switchMode('break'); 
-    }
-  };
-
-  const switchMode = (newMode) => {
-    setIsActive(false);
-    setIsZen(false);
-    setMode(newMode);
-    if (newMode === 'focus') {
-      setInitialTime(45 * 60);
-      setTimeLeft(45 * 60);
-    } else if (newMode === 'break') {
-      setInitialTime(10 * 60); 
-      setTimeLeft(10 * 60);
-    } else if (newMode === 'gaming') {
-      if (todayStats.gameBank <= 0) {
-        alert("⛔ 你的游戏券余额为0！请先去专注学习！\n\n提示：每专注45分钟 = 10分钟游戏时间。");
-        setMode('focus');
-        setInitialTime(45 * 60);
-        setTimeLeft(45 * 60);
-        return;
-      }
-      const availableSeconds = todayStats.gameBank * 60;
-      setInitialTime(availableSeconds);
-      setTimeLeft(availableSeconds);
-    }
-  };
-
-  const toggleFullScreen = async () => {
-    if (!appContainerRef.current) return;
-    
-    const isFullscreenAvailable = document.fullscreenEnabled || document.webkitFullscreenEnabled;
-    
-    if (!isFullscreenAvailable) return;
-
-    if (!document.fullscreenElement) {
-      try {
-        await appContainerRef.current.requestFullscreen();
-      } catch (err) { console.log("Fullscr err", err); }
-    } else {
-      try {
-        if (document.exitFullscreen) await document.exitFullscreen();
-      } catch (err) { console.log("Exit Fullscr err", err); }
-    }
-  };
-
-  const toggleTimer = () => {
-    if (mode === 'gaming' && todayStats.gameBank <= 0 && !isActive) {
-      alert("余额不足！");
-      return;
-    }
-    if (!isActive) {
-      setIsActive(true);
-      if (mode === 'focus') {
-        setIsZen(true);
-        if (appContainerRef.current && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
-            appContainerRef.current.requestFullscreen().catch(() => {});
-        }
-      }
-    } else {
-      setIsActive(false);
-    }
-  };
-
-  const handleTimerComplete = () => {
-    setIsActive(false); 
-    setIsZen(false);
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    clearInterval(timerRef.current);
-    if (mode === 'focus') {
-      setPendingStudyTime(initialTime); setShowLogModal(true);
-    } else if (mode === 'gaming') {
-      alert("⚠️ 游戏时间耗尽！"); updateGameStats(initialTime); 
-    } else { alert("🔔 休息结束！"); }
-  };
-
-  const triggerStopTimer = () => setShowStopModal(true);
-  const confirmStopTimer = () => { setShowStopModal(false); setIsActive(false); setIsZen(false); setTimeLeft(initialTime); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); if(mode==='gaming') updateGameStats(initialTime-timeLeft); };
-  const cancelStopTimer = () => setShowStopModal(false);
-  
-  const handleExportData = () => {
-    const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history));
-    const a = document.createElement('a'); a.href = str; a.download = `LevelUp_Backup_${getTodayDateString()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
-  
-  const handleImportData = (e) => {
-    const f = e.target.files[0]; if(!f)return; const r = new FileReader();
-    r.onload = (ev) => { try { const d = JSON.parse(ev.target.result); if(window.confirm(`导入 ${d.length} 条记录?`)) { localStorage.setItem('levelup_history', JSON.stringify(d)); loadData(); alert("成功!"); } } catch(err){alert("失败");} };
-    r.readAsText(f);
-  };
-
-  // --- 9. 渲染相关 (Render) ---
-  const progress = ((initialTime - timeLeft) / initialTime) * 100;
-  const dailyProgressPercent = Math.min((todayStats.studyMinutes / (stage.targetHours*60)) * 100, 100);
-  
   const getThemeColor = () => {
     if (mode === 'focus') return 'text-emerald-400 border-emerald-500 shadow-emerald-900/50';
     if (mode === 'break') return 'text-blue-400 border-blue-500 shadow-blue-900/50';
@@ -422,21 +688,30 @@ export default function LevelUpApp() {
      if (mode === 'gaming') return 'from-purple-950/90 to-black';
   };
 
-  const currentTheme = {
-    color: getThemeColor(),
-    textColor: mode === 'focus' ? 'text-emerald-400' : mode === 'break' ? 'text-blue-400' : 'text-purple-400'
-  };
-
-  if (loading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center font-mono">Loading System...</div>;
+  if (loading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center font-mono animate-pulse">Loading System...</div>;
 
   return (
-    <div ref={appContainerRef} className={`h-[100dvh] w-full bg-[#0a0a0a] text-gray-100 font-sans flex flex-col md:flex-row overflow-hidden relative`}>
+    <div ref={appContainerRef} className={`h-[100dvh] w-full bg-[#0a0a0a] text-gray-100 font-sans flex flex-col md:flex-row overflow-hidden relative selection:bg-cyan-500/30`}>
+      {/* Toast Notification Layer */}
+      <Toast notifications={notifications} removeNotification={removeNotification} />
+      
+      {/* Confirm Dialog Layer */}
+      <ConfirmDialog 
+        isOpen={confirmState.isOpen} 
+        title={confirmState.title} 
+        message={confirmState.message} 
+        onConfirm={confirmState.onConfirm} 
+        onCancel={closeConfirm}
+        isDangerous={confirmState.isDangerous}
+        confirmText={confirmState.confirmText}
+      />
+
       {/* 背景纹理 */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(20,20,40,0.4),transparent_70%)] pointer-events-none"></div>
       <div className="absolute inset-0 opacity-5 pointer-events-none mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
 
-      {/* Sidebar */}
-      <div className={`${isZen ? 'hidden' : 'flex'} flex-col w-full md:w-96 bg-[#111116] border-b md:border-b-0 md:border-r border-gray-800 p-4 md:p-6 gap-4 overflow-y-auto z-20 shadow-2xl flex-shrink-0 h-1/3 md:h-full relative group`}>
+      {/* 桌面端侧边栏 */}
+      <div className={`hidden md:flex flex-col w-96 bg-[#111116] border-r border-gray-800 p-6 gap-4 overflow-y-auto z-20 h-full relative group`}>
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-purple-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
         <div className="flex justify-between items-start relative z-10">
           <div>
@@ -452,15 +727,47 @@ export default function LevelUpApp() {
         </button>
 
         {showSettings && (
-          <div className="bg-[#1a1a20] border border-gray-700 rounded-lg p-4 text-xs animate-in fade-in slide-in-from-top-2 space-y-4 relative overflow-hidden">
+          <div className="bg-[#1a1a20] border border-gray-700 rounded-lg p-4 text-xs animate-in fade-in slide-in-from-top-2 space-y-4 relative z-50">
             <div className="relative z-10">
+              
+              {/* AI 人设设置 */}
+              <div className="mb-4 bg-purple-900/20 p-3 rounded-lg border border-purple-500/20">
+                <h3 className="text-purple-400 font-bold mb-2 flex items-center gap-2"><Sparkles className="w-3 h-3"/> 自定义导师人设</h3>
+                <textarea 
+                  value={customPersona}
+                  onChange={(e) => saveAISettings(apiKey, apiBaseUrl, apiModel, selectedProvider, e.target.value)}
+                  placeholder={DEFAULT_PERSONA}
+                  className="w-full bg-black/50 border border-purple-500/30 rounded p-2 text-white outline-none focus:border-purple-500 text-xs min-h-[60px] resize-none"
+                />
+              </div>
+
+              {/* 每日目标时长设置 */}
+              <div className="mb-4 bg-emerald-900/20 p-3 rounded-lg border border-emerald-500/20">
+                 <div className="flex justify-between items-center mb-1">
+                   <h3 className="text-emerald-400 font-bold flex items-center gap-2"><Clock className="w-3 h-3"/> 每日目标时长 (小时)</h3>
+                   {customTargetHours && <button onClick={() => saveTargetHours(null)} className="text-[10px] text-gray-400 underline">恢复默认</button>}
+                 </div>
+                 <input 
+                   type="range" 
+                   min="1" max="16" step="0.5"
+                   value={customTargetHours || stage.targetHours}
+                   onChange={(e) => saveTargetHours(parseFloat(e.target.value))}
+                   className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-gray-700 rounded-lg appearance-none"
+                 />
+                 <div className="flex justify-between text-gray-500 text-[10px] mt-1 font-mono">
+                   <span>1h</span>
+                   <span className="text-emerald-400 font-bold">{customTargetHours || stage.targetHours}h</span>
+                   <span>16h</span>
+                 </div>
+              </div>
+
               <h3 className="text-gray-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit className="w-4 h-4 text-cyan-500"/> AI 模型配置</h3>
               <div className="mb-2">
                 <label className="text-gray-500 block mb-1">服务商</label>
                 <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2 relative">
                   <select value={selectedProvider} onChange={(e) => {
                     const p = API_PROVIDERS.find(x => x.id === e.target.value);
-                    if (p) saveAISettings(apiKey, p.url, p.defaultModel, p.id);
+                    if (p) saveAISettings(apiKey, p.url, p.defaultModel, p.id, customPersona);
                     else setSelectedProvider('custom');
                   }} className="w-full bg-transparent py-2 text-white outline-none border-none appearance-none z-10 font-mono">
                     {API_PROVIDERS.map(p => <option key={p.id} value={p.id} className="bg-gray-900">{p.name}</option>)}
@@ -470,14 +777,14 @@ export default function LevelUpApp() {
               </div>
               <div className="mb-2">
                 <label className="text-gray-500 block mb-1">API Key</label>
-                <input type="password" placeholder="sk-..." value={apiKey} onChange={(e) => saveAISettings(e.target.value, apiBaseUrl, apiModel, selectedProvider)} className="w-full bg-black/50 border border-gray-600 rounded p-2 text-white outline-none focus:border-cyan-500 font-mono"/>
+                <input type="password" placeholder="sk-..." value={apiKey} onChange={(e) => saveAISettings(e.target.value, apiBaseUrl, apiModel, selectedProvider, customPersona)} className="w-full bg-black/50 border border-gray-600 rounded p-2 text-white outline-none focus:border-cyan-500 font-mono"/>
               </div>
               <div className="mb-2 relative">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-gray-500">模型名称</label>
                   <button onClick={fetchAvailableModels} disabled={isFetchingModels} className="text-[9px] bg-cyan-900/30 text-cyan-300 border border-cyan-800/50 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-cyan-800/50 transition-colors">{isFetchingModels ? <RefreshCw className="w-3 h-3 animate-spin"/> : <List className="w-3 h-3"/>} 获取列表</button>
                 </div>
-                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2">
+                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2 relative z-50">
                   <Cpu className="w-3 h-3 text-gray-500 mr-2 flex-shrink-0" />
                   <input type="text" value={apiModel} onChange={(e) => { setApiModel(e.target.value); setIsModelListOpen(true); setModelSearch(e.target.value); }} onFocus={() => setIsModelListOpen(true)} className="w-full bg-transparent py-2 text-white outline-none font-mono" placeholder="输入或选择模型"/>
                   <button onClick={() => setIsModelListOpen(!isModelListOpen)}><ChevronDown className="w-4 h-4 text-gray-500" /></button>
@@ -485,13 +792,13 @@ export default function LevelUpApp() {
                 
                 {/* Custom Dropdown for Models */}
                 {isModelListOpen && availableModels.length > 0 && (
-                  <div className="absolute top-full left-0 w-full bg-[#1a1a20] border border-gray-700 rounded-b-lg shadow-xl max-h-40 overflow-y-auto z-50 mt-1 font-mono">
+                  <div className="absolute top-full left-0 w-full bg-[#1a1a20] border border-gray-700 rounded-b-lg shadow-xl max-h-80 overflow-y-auto z-[100] mt-1 font-mono">
                     <div className="sticky top-0 bg-[#1a1a20] p-2 border-b border-gray-700 flex items-center gap-2">
                       <Search className="w-3 h-3 text-gray-500" />
                       <input type="text" value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} placeholder="搜索..." className="w-full bg-transparent text-white outline-none text-xs"/>
                     </div>
                     {availableModels.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase())).map(m => (
-                      <div key={m} onClick={() => { setApiModel(m); saveAISettings(apiKey, apiBaseUrl, m, selectedProvider); setIsModelListOpen(false); }} className="px-3 py-2 hover:bg-cyan-900/30 cursor-pointer truncate text-gray-300 hover:text-cyan-400 transition-colors">{m}</div>
+                      <div key={m} onClick={() => { setApiModel(m); saveAISettings(apiKey, apiBaseUrl, m, selectedProvider, customPersona); setIsModelListOpen(false); }} className="px-3 py-2 hover:bg-cyan-900/30 cursor-pointer truncate text-gray-300 hover:text-cyan-400 transition-colors text-xs">{m}</div>
                     ))}
                   </div>
                 )}
@@ -506,16 +813,33 @@ export default function LevelUpApp() {
         )}
 
         {/* 状态卡片 */}
-        <div className={`rounded-xl p-3 md:p-4 border-l-4 ${stage.borderColor} ${stage.bg} relative overflow-hidden`}>
+        <div className={`rounded-xl p-3 md:p-4 border-l-4 ${stage.borderColor} ${stage.bg} relative overflow-hidden z-0`}>
           <div className="flex items-center gap-2 mb-1 relative z-10"><Target className={`w-4 h-4 ${stage.color}`} /><span className={`text-xs font-bold ${stage.color} tracking-widest uppercase`}>STAGE: {stage.name}</span></div>
           <div className="pl-6 relative z-10">
-            <div className="flex justify-between text-xs mb-1 text-gray-400"><span>DAILY TARGET</span><span className="font-mono">{stage.targetHours}h</span></div>
+            <div className="flex justify-between text-xs mb-1 text-gray-400">
+               <span>DAILY TARGET</span>
+               <span className="font-mono flex items-center gap-1">
+                 {customTargetHours && <span className="text-[10px] bg-gray-700 px-1 rounded text-white" title="自定义目标">自定义</span>}
+                 {currentTargetHours}h
+               </span>
+            </div>
             <div className="h-1.5 w-full bg-black/30 rounded-full overflow-hidden"><div className={`h-full ${stage.color.replace('text', 'bg')} transition-all duration-1000 shadow-[0_0_10px_currentColor]`} style={{ width: `${dailyProgressPercent}%` }}></div></div>
-            <div className="text-[10px] text-gray-500 mt-1 text-right font-mono">{(todayStats.studyMinutes/60).toFixed(1)}h / {stage.targetHours}h</div>
+            <div className="text-[10px] text-gray-500 mt-1 text-right font-mono">{(todayStats.studyMinutes/60).toFixed(1)}h / {currentTargetHours}h</div>
           </div>
         </div>
+        
+        {/* 日志列表 + 手动补录按钮 */}
+        <div className="flex items-center justify-between px-1 mt-2 mb-1 relative z-0">
+            <span className="text-xs font-bold text-gray-500">TODAY'S LOGS</span>
+            <button 
+              onClick={openManualLog}
+              className="text-[10px] flex items-center gap-1 bg-emerald-900/30 text-emerald-400 border border-emerald-800/50 px-2 py-0.5 rounded hover:bg-emerald-800/50 transition-colors"
+            >
+              <PlusCircle className="w-3 h-3" /> 补录
+            </button>
+        </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-1 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-1 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent relative z-0">
            {todayStats.logs && todayStats.logs.slice().reverse().map((log, i) => (
              <div key={i} className="bg-[#1a1a20] p-3 rounded border-l-2 border-emerald-500/50 text-xs text-gray-300 relative group hover:bg-[#222228] transition-colors">
                <div className="flex justify-between text-gray-500 mb-1"><span className="font-mono text-emerald-600">{log.time}</span><span className="text-emerald-500/80">+{log.duration}m XP</span></div>
@@ -525,49 +849,267 @@ export default function LevelUpApp() {
         </div>
       </div>
 
+      {/* 移动端底部导航 */}
+      <MobileNav 
+        mode={mode}
+        switchMode={switchMode}
+        startAICoach={startAICoach}
+        showSettings={showSettings}
+        setShowSettings={setShowSettings}
+        todayStats={todayStats}
+        activeView={activeView}
+        setActiveView={setActiveView}
+        openManualLog={openManualLog}
+      />
+
       {/* Main Timer Area */}
-      <div className={`flex-1 flex flex-col items-center justify-center p-4 relative bg-gradient-to-br ${getBgColor()} transition-colors duration-1000 overflow-hidden`}>
-        <div className={`absolute top-4 right-4 z-30 ${isZen && isActive ? 'opacity-0 hover:opacity-100 transition-opacity' : ''}`}>
-           {isZen && <button onClick={() => setIsZen(false)} className="mr-2 bg-black/50 text-gray-400 px-3 py-2 rounded text-xs backdrop-blur-md hover:text-white border border-white/10">退出禅模式</button>}
-           <button onClick={toggleFullScreen} className="bg-black/30 text-white p-2 rounded-lg hover:bg-white/10 transition backdrop-blur-md">{isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}</button>
-        </div>
-
-        <div className={`flex gap-2 mb-12 bg-black/40 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 z-10 transition-all duration-500 ${isZen ? '-translate-y-40 opacity-0 absolute' : ''}`}>
-          <button onClick={() => switchMode('focus')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${mode === 'focus' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}><BookOpen className="w-4 h-4"/> 专注</button>
-          <button onClick={() => switchMode('break')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${mode === 'break' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}><Coffee className="w-4 h-4"/> 休息</button>
-          <button onClick={() => switchMode('gaming')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${mode === 'gaming' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}><Gamepad2 className="w-4 h-4"/> 奖励</button>
-        </div>
-
-        <div className={`relative mb-8 group transition-all duration-1000 ${isZen ? 'scale-125 md:scale-150' : 'scale-100'}`}>
-          <div className={`rounded-full flex items-center justify-center relative shadow-[0_0_50px_-10px_currentColor] transition-all duration-1000 ${isZen ? '' : `border-8 bg-black/50 backdrop-blur-sm ${currentTheme.color.split(' ')[1] /* Takes the border class */}`}`} style={{ width: 'min(70vmin, 320px)', height: 'min(70vmin, 320px)' }}>
-             <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
-               {!isZen && <circle cx="50" cy="50" r="44" fill="none" stroke="#222" strokeWidth="2" />}
-               <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth={isZen ? "2" : "4"} strokeLinecap="round" strokeDasharray="276" strokeDashoffset={276 - (276 * progress) / 100} className={`transition-all duration-1000 ease-linear ${isZen ? 'text-white/30' : ''}`}/>
-             </svg>
-             <div className="flex flex-col items-center z-10 select-none w-full">
-               <div className={`font-mono font-bold tabular-nums text-center text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] w-[5ch] transition-all duration-500 ${isZen ? 'text-[18vmin]' : 'text-[13vmin]'}`}>{formatTime(timeLeft)}</div>
-               <div className={`text-xs mt-2 font-bold tracking-[0.2em] uppercase transition-opacity duration-500 ${isZen ? 'opacity-30' : 'opacity-100'} ${currentTheme.textColor}`}>{mode === 'focus' ? 'DEEP WORK' : mode === 'break' ? 'RECHARGING' : 'PLAYING'}</div>
-             </div>
+      <div className={`flex-1 flex flex-col items-center justify-center p-4 relative bg-gradient-to-br ${getBgColor()} transition-colors duration-1000 overflow-hidden pb-20 md:pb-4`}>
+        
+        {/* 移动端视图切换 */}
+        <div className={`md:hidden w-full mb-4 ${activeView !== 'timer' ? 'hidden' : ''}`}>
+          <div className="flex gap-2 bg-gray-900/80 backdrop-blur-md p-2 rounded-2xl border border-gray-700/50 shadow-2xl z-10">
+            <button 
+              onClick={() => switchMode('focus')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'focus' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <BookOpen className="w-4 h-4" /> <span>学习</span>
+            </button>
+            <button 
+              onClick={() => switchMode('break')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'break' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <Coffee className="w-4 h-4" /> <span>休息</span>
+            </button>
+            <button 
+              onClick={() => switchMode('gaming')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'gaming' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <Gamepad2 className="w-4 h-4" /> <span>游戏</span>
+            </button>
           </div>
         </div>
 
-        <div className={`flex gap-6 z-10 transition-all duration-300 ${isZen && isActive ? 'opacity-100' : 'opacity-100'}`}>
-           {!isActive ? (
-             <button onClick={toggleTimer} className="w-20 h-20 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 hover:shadow-[0_0_30px_white] transition-all active:scale-95"><Play className="w-8 h-8 ml-1 fill-black"/></button>
-           ) : (
-             <div className="flex gap-6">
-                <button onClick={toggleTimer} className="w-20 h-20 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center hover:bg-white/10 hover:border-white/50 transition-all active:scale-95 backdrop-blur-md"><Pause className="w-8 h-8 fill-white"/></button>
-                <button onClick={triggerStopTimer} className="w-20 h-20 rounded-full bg-red-500/20 border border-red-500/50 text-red-500 flex items-center justify-center hover:bg-red-500/40 hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-all active:scale-95 backdrop-blur-md"><Square className="w-6 h-6 fill-red-500"/></button>
-             </div>
-           )}
-           {!isZen && (<button onClick={() => { setIsActive(false); setTimeLeft(initialTime); }} className="absolute bottom-8 right-8 md:static w-12 h-12 rounded-full bg-white/5 border border-white/10 text-gray-400 flex items-center justify-center hover:text-white hover:bg-white/10 transition-all" title="Reset Timer"><RotateCcw className="w-5 h-5" /></button>)}
+        {/* 移动端数据视图 */}
+        <div className={`md:hidden w-full ${activeView !== 'stats' ? 'hidden' : ''}`}>
+          <div className="bg-[#111116] rounded-xl p-4 border border-gray-800 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="w-5 h-5 text-emerald-400" />
+              <h2 className="text-lg font-bold text-white">今日数据</h2>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">学习时长</span>
+                <span className="text-white font-mono">{(todayStats.studyMinutes/60).toFixed(1)}h</span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">游戏余额</span>
+                <span className="text-purple-400 font-mono">{todayStats.gameBank}m</span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">游戏已用</span>
+                <span className="text-purple-400 font-mono">{todayStats.gameUsed}m</span>
+              </div>
+              
+              <div className="pt-2 border-t border-gray-800">
+                <div className="flex justify-between text-xs mb-1 text-gray-400">
+                  <span>目标进度</span>
+                  <span className="font-mono">{currentTargetHours}h</span>
+                </div>
+                <div className="h-2 w-full bg-black/30 rounded-full overflow-hidden">
+                  <div className={`h-full bg-emerald-500 transition-all duration-1000`} style={{ width: `${dailyProgressPercent}%` }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-[#111116] rounded-xl p-4 border border-gray-800">
+            <div className="flex items-center gap-2 mb-3">
+              <History className="w-5 h-5 text-cyan-400" />
+              <h2 className="text-lg font-bold text-white">学习记录</h2>
+            </div>
+            
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {todayStats.logs && todayStats.logs.slice().reverse().map((log, i) => (
+                <div key={i} className="bg-[#1a1a20] p-3 rounded border-l-2 border-emerald-500/50 text-xs text-gray-300">
+                  <div className="flex justify-between text-gray-500 mb-1">
+                    <span className="font-mono text-emerald-600">{log.time}</span>
+                    <span className="text-emerald-500/80">+{log.duration}m</span>
+                  </div>
+                  <div>{typeof log.content === 'string' ? log.content : 'Log Entry'}</div>
+                </div>
+              ))}
+              {(!todayStats.logs || todayStats.logs.length === 0) && (
+                <div className="text-center text-gray-500 py-4">暂无学习记录</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 计时器视图 */}
+        <div className={`${activeView === 'timer' ? 'flex' : 'hidden md:flex'} flex-col items-center w-full`}>
+          <div className={`absolute top-4 right-4 z-30 transition-opacity duration-300 flex items-center gap-4 ${isZen && isActive ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}>
+            {isZen && <button onClick={() => setIsZen(false)} className="bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white px-3 py-2 rounded text-xs transition">
+                  退出禅模式
+                </button>
+            }
+            <button 
+              onClick={toggleFullScreen}
+              className="bg-gray-800/50 hover:bg-gray-700 text-white p-2 rounded-lg backdrop-blur-sm transition-all shadow-lg"
+              title="全屏显示"
+            >
+              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+          </div>
+
+          {/* 桌面端模式切换 */}
+          <div className={`hidden md:flex gap-4 mb-8 md:mb-12 bg-gray-900/80 backdrop-blur-md p-2 rounded-2xl border border-gray-700/50 shadow-2xl z-10 transition-all duration-500 ${isZen ? '-translate-y-40 opacity-0 scale-75 absolute pointer-events-none' : 'translate-y-0 opacity-100 scale-100 pointer-events-auto'}`}>
+            <button 
+              onClick={() => switchMode('focus')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'focus' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <BookOpen className="w-4 h-4" /> <span>专注学习</span>
+            </button>
+            <button 
+              onClick={() => switchMode('break')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'break' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <Coffee className="w-4 h-4" /> <span>休息</span>
+            </button>
+            <button 
+              onClick={() => switchMode('gaming')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all ${mode === 'gaming' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              <Gamepad2 className="w-4 h-4" /> <span>奖励时刻</span>
+            </button>
+          </div>
+
+          <div className={`relative mb-8 md:mb-12 group transition-all duration-700 ease-in-out ${isZen ? 'scale-125 md:scale-[2.5]' : 'scale-90 md:scale-100'}`}>
+            {/* Zen Mode Decorative Elements */}
+            {!isZen && (
+              <>
+                <div className={`absolute inset-0 rounded-full border-4 border-gray-800/50 scale-110`}></div>
+                <div className={`absolute inset-0 rounded-full border-4 opacity-20 blur-md transition-all duration-500 ${getThemeColor().split(' ')[0].replace('text', 'border')}`}></div>
+              </>
+            )}
+            
+            <div className={`
+               rounded-full flex items-center justify-center relative transition-all duration-500 
+               ${isZen ? 'w-56 h-56 border-0' : `w-64 h-64 md:w-80 md:h-80 border-8 bg-gray-900 shadow-[0_0_60px_-15px_rgba(0,0,0,0.6)] ${getThemeColor()}`}
+            `}>
+               
+               {/* Progress Circle - Simplified in Zen Mode */}
+               <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
+                 {!isZen && <circle cx="50" cy="50" r="44" fill="none" stroke="#1f2937" strokeWidth="4" />}
+                 <circle 
+                   cx="50" cy="50" r="44" fill="none" 
+                   stroke="currentColor" 
+                   strokeWidth={isZen ? "2" : "4"} 
+                   strokeLinecap="round"
+                   strokeDasharray="276"
+                   strokeDashoffset={276 - (276 * progress) / 100}
+                   className={`transition-all duration-1000 ease-linear ${isZen ? 'text-white/20' : ''}`}
+                 />
+               </svg>
+
+               <div className="flex flex-col items-center z-10 select-none">
+                 <div className={`font-mono font-bold tracking-tighter tabular-nums text-white drop-shadow-2xl transition-all duration-500 ${isZen ? 'text-6xl' : 'text-5xl md:text-7xl'}`}>
+                   {formatTime(timeLeft)}
+                 </div>
+                 
+                 <div className={`text-sm mt-4 font-bold tracking-widest uppercase transition-all duration-500 ${mode === 'focus' ? 'text-emerald-400' : mode === 'break' ? 'text-blue-400' : 'text-purple-400'} ${isZen ? 'opacity-50' : 'opacity-100'}`}>
+                   {mode === 'focus' ? 'DEEP WORK' : mode === 'break' ? 'RECHARGE' : 'GAME ON'}
+                 </div>
+                 
+                 {!isZen && mode === 'focus' && isActive && (
+                    <div className="text-[10px] text-gray-500 mt-2 bg-gray-800 px-2 py-1 rounded-full animate-pulse border border-gray-700">
+                      预计收益: +{Math.floor(initialTime / 60 / 4.5)}m 券
+                    </div>
+                 )}
+               </div>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className={`flex gap-4 md:gap-6 z-10 transition-all duration-300 ${isZen && isActive ? 'opacity-30 hover:opacity-100' : 'opacity-100'}`}>
+            {!isActive ? (
+              <button 
+                onClick={toggleTimer}
+                className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 hover:bg-gray-100 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] active:scale-95 touch-manipulation"
+              >
+                <Play className="w-6 h-6 md:w-8 md:h-8 ml-0.5" />
+              </button>
+            ) : (
+              <div className="flex gap-4 md:gap-6">
+                 <button 
+                   onClick={toggleTimer}
+                   className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gray-800 border-2 border-gray-600 text-white flex items-center justify-center hover:bg-gray-700 hover:border-gray-500 transition-all active:scale-95 shadow-xl touch-manipulation"
+                 >
+                   <Pause className="w-6 h-6 md:w-8 md:h-8" />
+                 </button>
+                 <button 
+                   onClick={triggerStopTimer}
+                   className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-950/30 border-2 border-red-900/50 text-red-500 flex items-center justify-center hover:bg-red-900/40 hover:border-red-500 transition-all active:scale-95 shadow-xl touch-manipulation"
+                 >
+                   <Square className="w-5 h-5 md:w-6 md:h-6" />
+                 </button>
+              </div>
+            )}
+            
+            {!isZen && (
+             <button 
+               onClick={() => {
+                   setIsActive(false);
+                   setTimeLeft(initialTime);
+               }}
+               className="absolute bottom-4 right-4 md:static w-12 h-12 rounded-full bg-gray-800/50 border border-gray-700 text-gray-400 flex items-center justify-center hover:text-white hover:border-gray-500 transition-all touch-manipulation"
+               title="重置计时"
+             >
+               <RotateCcw className="w-4 h-4" />
+             </button>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Stop Confirmation Modal */}
+      {showStopModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-gray-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-[0_0_50px_rgba(239,68,68,0.2)]">
+            <div className="flex items-center gap-4 mb-4 text-red-500">
+               <AlertTriangle className="w-8 h-8" />
+               <h3 className="text-xl font-bold text-white">确定要放弃吗？</h3>
+            </div>
+            
+            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+              如果现在停止，你本次的努力将<span className="text-red-400 font-bold">不会获得任何奖励</span>。坚持就是胜利！
+            </p>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={cancelStopTimer}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition-colors"
+              >
+                继续坚持
+              </button>
+              <button 
+                onClick={confirmStopTimer}
+                className="flex-1 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800 font-bold py-3 rounded-xl transition-colors"
+              >
+                放弃进度
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI Chat Modal */}
       {showChatModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
-          <div className="bg-[#111116] w-full md:max-w-md h-full md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in zoom-in duration-200">
+          <div className="bg-[#111116] w-full h-full md:max-w-md md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800">
+            {/* Chat Header */}
             <div className="p-4 bg-[#16161c] border-b border-gray-800 flex justify-between items-center z-10 shadow-lg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg"><Sparkles className="w-5 h-5 text-white" /></div>
@@ -576,26 +1118,51 @@ export default function LevelUpApp() {
               <button onClick={() => setShowChatModal(false)} className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition"><X className="w-4 h-4"/></button>
             </div>
 
+            {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0a0a0a]">
               {chatMessages.filter(m => m.role !== 'system').map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                  <div className={`max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-md ${msg.role === 'user' ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-[#1f1f27] text-gray-200 rounded-bl-none border border-gray-800'}`}>
+                  {/* Avatar for AI */}
+                  {msg.role === 'assistant' && (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex-shrink-0 flex items-center justify-center mr-2 self-start mt-1">
+                      <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                  
+                  <div className={`max-w-[75%] p-3.5 text-sm leading-relaxed shadow-md relative ${
+                    msg.role === 'user' 
+                      ? 'bg-emerald-600 text-white rounded-2xl rounded-tr-none' 
+                      : 'bg-white text-gray-900 rounded-2xl rounded-tl-none'
+                  }`}>
                     {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
                   </div>
+
+                  {/* Avatar for User */}
+                  {msg.role === 'user' && (
+                    <div className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 flex items-center justify-center ml-2 self-start mt-1">
+                      <User className="w-4 h-4 text-gray-300" />
+                    </div>
+                  )}
                 </div>
               ))}
+              
+              {/* Typing Indicator */}
               {aiThinking && (
                 <div className="flex justify-start animate-pulse">
-                  <div className="bg-[#1f1f27] p-4 rounded-2xl rounded-bl-none flex gap-1.5 items-center border border-gray-800">
-                    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce delay-75"></div>
-                    <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce delay-150"></div>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex-shrink-0 flex items-center justify-center mr-2">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="bg-white p-4 rounded-2xl rounded-tl-none flex gap-1.5 items-center">
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></div>
                   </div>
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
 
+            {/* Input Area */}
             <div className="p-3 bg-[#16161c] border-t border-gray-800 flex flex-col gap-2">
               {showEmojiPicker && (
                 <div className="bg-[#1f1f27] p-3 rounded-xl grid grid-cols-6 gap-2 mb-2 absolute bottom-20 left-4 shadow-xl border border-gray-700 z-50 animate-in zoom-in duration-200 origin-bottom-left">
@@ -612,30 +1179,40 @@ export default function LevelUpApp() {
         </div>
       )}
 
-      {/* Other Modals (Stop/Log) - Styled */}
-      {showStopModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-in fade-in zoom-in duration-200">
-          <div className="bg-[#16161c] border border-red-500/30 rounded-3xl p-6 max-w-sm w-full shadow-[0_0_50px_rgba(239,68,68,0.15)]">
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-2"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
-              <h3 className="text-xl font-bold text-white">确定要放弃吗？</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">如果现在停止，你本次的努力将<span className="text-red-400 font-bold">不会获得任何奖励</span>。坚持就是胜利！</p>
-              <div className="flex gap-3 w-full mt-2">
-                <button onClick={cancelStopTimer} className="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-3.5 rounded-2xl transition-colors">继续坚持</button>
-                <button onClick={confirmStopTimer} className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50 font-bold py-3.5 rounded-2xl transition-colors">放弃</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Log Modal (Supports Both Timer Finish and Manual Entry) */}
       {showLogModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-in fade-in zoom-in duration-200">
-          <div className="bg-[#16161c] border border-emerald-500/30 rounded-3xl p-6 max-w-md w-full shadow-[0_0_50px_rgba(16,185,129,0.15)]">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3 text-emerald-400"><CheckCircle2 className="w-8 h-8" /><h3 className="text-2xl font-bold text-white">任务完成！</h3></div>
-              <textarea value={logContent} onChange={(e)=>setLogContent(e.target.value)} className="w-full bg-black/30 border border-gray-700 rounded-2xl p-4 text-white min-h-[120px] outline-none focus:border-emerald-500/50 transition-colors placeholder:text-gray-600" placeholder="记录一下刚才的成就..." autoFocus/>
-              <button onClick={saveLog} disabled={!logContent.trim()} className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-4 rounded-2xl shadow-lg disabled:opacity-50 transition-all transform active:scale-[0.98]">存入档案 (+10m 券)</button>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-gray-900 border border-emerald-500/30 rounded-2xl p-6 max-w-md w-full shadow-[0_0_50px_rgba(16,185,129,0.15)] relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-cyan-500"></div>
+            <div className="flex items-center gap-4 mb-6">
+               <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                 {isManualLog ? <PlusCircle className="w-6 h-6" /> : <CheckCircle2 className="w-6 h-6" />}
+               </div>
+               <div>
+                 <h3 className="text-xl font-bold text-white">{isManualLog ? '补录学习记录' : 'Focus Session Complete!'}</h3>
+                 <p className="text-xs text-gray-400">经验值已到账，请记录你的成就</p>
+               </div>
             </div>
+            
+            <div className="space-y-4">
+               {/* 补录时显示时长输入 */}
+               {isManualLog && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">时长 (分钟)</label>
+                    <input 
+                      type="number" 
+                      value={manualDuration} 
+                      onChange={(e) => setManualDuration(Number(e.target.value))}
+                      className="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white font-mono"
+                    />
+                  </div>
+               )}
+
+               <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">本次成果 (Log Content)</label><textarea value={logContent} onChange={(e) => setLogContent(e.target.value)} placeholder="做了什么？(例如：完成了660题第二章前10题，理解了泰勒公式展开...)" className="w-full bg-black/50 border border-gray-700 rounded-xl p-4 text-gray-200 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 min-h-[120px] resize-none text-sm placeholder:text-gray-700" autoFocus /></div>
+               <button onClick={saveLog} disabled={!logContent.trim()} className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"><Save className="w-4 h-4" /> 存入档案并休息 (+{isManualLog ? Math.floor(manualDuration/4.5) : Math.floor(pendingStudyTime/60/4.5)}m 券)</button>
+            </div>
+            
+            <button onClick={() => setShowLogModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X className="w-5 h-5"/></button>
           </div>
         </div>
       )}
