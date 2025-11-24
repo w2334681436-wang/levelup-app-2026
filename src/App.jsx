@@ -126,28 +126,28 @@ const SUBJECT_CONFIG = {
   cs: { name: "专业课二（408）", color: "text-purple-400", keyword: ['408', '计组', '数据结构', '操作系统', '计算机网络'] },
 };
 
+// 学习进度现在使用 content 字段来存储详细的学习内容
 const initialProgress = {
-  english: { progress: 0, lastUpdate: getTodayDateString() },
-  politics: { progress: 0, lastUpdate: getTodayDateString() },
-  math: { progress: 0, lastUpdate: getTodayDateString() },
-  cs: { progress: 0, lastUpdate: getTodayDateString() },
+  english: { content: "目前已学习完单词书第一册，开始做长难句分析。", lastUpdate: getTodayDateString() },
+  politics: { content: "未开始政治基础学习。", lastUpdate: getTodayDateString() },
+  math: { content: "完成了高等数学上册的全部基础知识点梳理和练习。", lastUpdate: getTodayDateString() },
+  cs: { content: "数据结构完成了链表和栈的初步学习。", lastUpdate: getTodayDateString() },
 };
 
 // --- 4. 组件：学习进度面板 ---
 const LearningProgressPanel = ({ learningProgress, onProgressUpdate, isMobileView }) => {
   const [editingSubject, setEditingSubject] = useState(null);
-  const [tempProgress, setTempProgress] = useState(0);
+  const [tempContent, setTempContent] = useState(''); // 修改为 tempContent
 
-  const startEdit = (subjectKey, currentProgress) => {
+  const startEdit = (subjectKey, currentContent) => {
     setEditingSubject(subjectKey);
-    setTempProgress(currentProgress);
+    setTempContent(currentContent);
   };
 
   const saveEdit = (subjectKey) => {
-    if (tempProgress >= 0 && tempProgress <= 100) {
-      onProgressUpdate(subjectKey, tempProgress, 'manual');
-      setEditingSubject(null);
-    }
+    // 这里的 onProgressUpdate 接收的是 content 字符串
+    onProgressUpdate(subjectKey, tempContent, 'manual');
+    setEditingSubject(null);
   };
   
   const subjects = Object.entries(SUBJECT_CONFIG);
@@ -159,42 +159,36 @@ const LearningProgressPanel = ({ learningProgress, onProgressUpdate, isMobileVie
       </h2>
 
       {subjects.map(([key, config]) => (
-        <div key={key} className="bg-gray-900/50 p-3 rounded-lg border border-gray-800">
-          <div className="flex justify-between items-center mb-1">
+        <div key={key} className="bg-gray-900/50 p-3 rounded-lg border border-gray-800 space-y-2">
+          <div className="flex justify-between items-start mb-1">
             <span className={`font-semibold ${config.color}`}>{config.name}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-mono text-white">{learningProgress[key].progress}%</span>
-              <button 
-                onClick={() => startEdit(key, learningProgress[key].progress)}
-                className="text-gray-500 hover:text-cyan-400 transition"
-              >
-                <Edit className="w-3 h-3" />
-              </button>
-            </div>
+            <button 
+              onClick={() => startEdit(key, learningProgress[key].content)}
+              className="text-gray-500 hover:text-cyan-400 transition flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-gray-800/50 hover:bg-gray-700"
+            >
+              <Edit className="w-3 h-3 flex-shrink-0" /> 编辑
+            </button>
           </div>
           
-          <div className="h-2 w-full bg-black/30 rounded-full overflow-hidden">
-            <div 
-              className={`h-full ${config.color.replace('text', 'bg')} transition-all duration-1000`} 
-              style={{ width: `${learningProgress[key].progress}%` }}
-            ></div>
+          {/* 显示具体的学习内容 */}
+          <div className="text-xs text-gray-300 bg-black/30 p-2 rounded-lg max-h-24 overflow-y-auto whitespace-pre-wrap font-mono scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+             {learningProgress[key].content || '暂无详细学习记录。'}
           </div>
+
           <p className="text-[10px] text-gray-500 mt-1 text-right">上次更新: {learningProgress[key].lastUpdate}</p>
         </div>
       ))}
 
-      {/* Edit Modal */}
+      {/* Edit Modal - 修改为文本输入 */}
       {editingSubject && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-gray-900 border border-cyan-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-4">手动更新: {SUBJECT_CONFIG[editingSubject].name}</h3>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">进度 (%)</label>
-            <input 
-              type="number" 
-              min="0" max="100" 
-              value={tempProgress} 
-              onChange={(e) => setTempProgress(Math.max(0, Math.min(100, Number(e.target.value))))}
-              className="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white font-mono mb-4"
+          <div className="bg-gray-900 border border-cyan-500/30 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4">编辑: {SUBJECT_CONFIG[editingSubject].name} 学习内容</h3>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">学习内容详情（可换行，最多 5000 字）</label>
+            <textarea 
+              value={tempContent} 
+              onChange={(e) => setTempContent(e.target.value)}
+              className="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white font-mono mb-4 min-h-[200px] resize-none text-sm"
               autoFocus
             />
             <div className="flex gap-3">
@@ -208,7 +202,7 @@ const LearningProgressPanel = ({ learningProgress, onProgressUpdate, isMobileVie
   );
 };
 
-// 移动端底部导航组件
+// 移动端底部导航组件 (保持不变)
 const MobileNav = ({ 
   mode, 
   switchMode, 
@@ -353,22 +347,29 @@ export default function LevelUpApp() {
     }
   };
 
-  // 自动更新学习进度的核心逻辑
+  // 自动更新学习进度的核心逻辑: 从百分比修改为内容追加
   const autoUpdateProgress = (logContent, currentProgress) => {
-    const newProgress = { ...currentProgress };
+    // 使用深拷贝来安全修改对象
+    const newProgress = JSON.parse(JSON.stringify(currentProgress)); 
     const lowerLog = logContent.toLowerCase();
     const date = getTodayDateString();
     let updated = false;
 
-    // 假设每次有效打卡给对应科目增加 2% 进度
-    const progressIncrement = 2; 
-
     Object.entries(SUBJECT_CONFIG).forEach(([key, config]) => {
-      const isMatch = config.keyword.some(kw => lowerLog.includes(kw));
+      const isMatch = config.keyword.some(kw => lowerLog.includes(kw.toLowerCase()));
       if (isMatch) {
-        newProgress[key].progress = Math.min(100, newProgress[key].progress + progressIncrement);
-        newProgress[key].lastUpdate = date;
-        updated = true;
+        // 新逻辑：追加打卡内容到对应科目的 content
+        const existingContent = newProgress[key].content.trim();
+        const newEntry = `[${date} 打卡] ${logContent}`;
+        
+        // 检查打卡内容是否已经包含在现有内容中，避免重复。
+        if (!existingContent.includes(newEntry.substring(0, 50))) { 
+          const separator = existingContent ? "\n---\n" : "";
+          // 限制内容长度，防止 localStorage 溢出
+          newProgress[key].content = (existingContent + separator + newEntry).substring(0, 5000); 
+          newProgress[key].lastUpdate = date;
+          updated = true;
+        }
       }
     });
     
@@ -417,11 +418,23 @@ export default function LevelUpApp() {
       const storedModelList = JSON.parse(localStorage.getItem('ai_model_list') || '[]');
       const storedChat = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
 
-      // 加载新的学习进度 (Feature 4)
+      // 加载新的学习进度 
       const storedProgressText = localStorage.getItem('levelup_progress');
       let storedProgress = initialProgress;
       if (storedProgressText) {
-        try { storedProgress = JSON.parse(storedProgressText); } catch (e) { console.error("Progress JSON Error", e); }
+        try { 
+          const parsed = JSON.parse(storedProgressText);
+          // 兼容旧的 progress 结构，如果发现是数字，则使用 initialProgress 默认内容
+          if (parsed.english && typeof parsed.english.progress === 'number') {
+             // 发现旧的进度条格式，使用默认内容
+             storedProgress = initialProgress;
+          } else {
+             storedProgress = parsed;
+          }
+        } catch (e) { 
+          console.error("Progress JSON Error", e); 
+          storedProgress = initialProgress;
+        }
       }
       
       setLearningProgress(storedProgress);
@@ -498,19 +511,19 @@ export default function LevelUpApp() {
     }
   };
   
-  // 更新学习进度 (Feature 4 - Manual update hook)
-  const handleProgressUpdate = (subjectKey, newProgress, type = 'manual') => {
+  // 更新学习进度: 现在接收 newContent 字符串
+  const handleProgressUpdate = (subjectKey, newContent, type = 'manual') => {
     setLearningProgress(prev => {
       const updated = {
         ...prev,
         [subjectKey]: {
-          progress: newProgress,
+          content: newContent,
           lastUpdate: getTodayDateString()
         }
       };
       saveLearningProgress(updated);
       if (type === 'manual') {
-        addNotification(`${SUBJECT_CONFIG[subjectKey].name} 进度更新至 ${newProgress}%`, "info");
+        addNotification(`${SUBJECT_CONFIG[subjectKey].name} 学习内容已更新`, "info");
       }
       return updated;
     });
@@ -628,7 +641,7 @@ export default function LevelUpApp() {
       logs: [...todayStats.logs, { time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}), content: log, duration: m }] 
     };
     saveData(newStats);
-    // 自动更新进度 (Feature 4)
+    // 自动更新进度 (从 log content 提取信息并追加)
     autoUpdateProgress(log, learningProgress); 
   };
 
@@ -782,7 +795,7 @@ export default function LevelUpApp() {
   
   const cancelStopTimer = () => setShowStopModal(false);
 
-  // ... (导入导出函数保持不变) ...
+  // ... (导入导出函数) ...
   const handleExportData = () => {
     try {
       const exportData = {
@@ -812,7 +825,12 @@ export default function LevelUpApp() {
         const d = JSON.parse(ev.target.result); 
         // 导入时兼容旧格式（数组）和新格式（对象）
         const dataToImport = Array.isArray(d) ? d : d.history;
-        const progressToImport = d.progress || initialProgress;
+        let progressToImport = d.progress || initialProgress;
+
+         // 兼容导入旧的进度条格式，如果发现是数字，则使用 initialProgress 默认内容
+         if (progressToImport.english && typeof progressToImport.english.progress === 'number') {
+             progressToImport = initialProgress;
+         }
         
         if (Array.isArray(dataToImport)) {
           setPendingImportData({ history: dataToImport, progress: progressToImport });
@@ -843,7 +861,7 @@ export default function LevelUpApp() {
     addNotification("数据导入成功！", "success");
     setPendingImportData(null);
   };
-  // ... (AI 模型获取函数保持不变) ...
+  // ... (AI 模型获取函数) ...
 
   const fetchAvailableModels = async () => {
     if (!apiKey) return addNotification("请先输入 API Key！", "error");
@@ -908,7 +926,7 @@ export default function LevelUpApp() {
     }
   };
 
-  // AI 导师启动逻辑 (Feature 3 核心)
+  // AI 导师启动逻辑 (修改上下文以反映新的进度内容)
   const startAICoach = () => {
     if (!apiKey) {
       addNotification("请先在设置中输入 API Key！", "error");
@@ -931,11 +949,11 @@ export default function LevelUpApp() {
         1. 考研目标: 上海交大/中科大AI硕士(2026)。
         2. 每日目标学习时长: ${target}小时。
         3. 今日(${getTodayDateString()})统计: 已学习 ${(todayStats.studyMinutes / 60).toFixed(1)}h, 游戏券余额 ${todayStats.gameBank}m。
-        4. 学习进度板:
-           - 英语: ${learningProgress.english.progress}% (更新于 ${learningProgress.english.lastUpdate})
-           - 政治: ${learningProgress.politics.progress}% (更新于 ${learningProgress.politics.lastUpdate})
-           - 数学: ${learningProgress.math.progress}% (更新于 ${learningProgress.math.lastUpdate})
-           - 408: ${learningProgress.cs.progress}% (更新于 ${learningProgress.cs.lastUpdate})
+        4. 学习进度板 (最新的学习内容和状态):
+           - 英语: ${learningProgress.english.content || '暂无记录'} (更新于 ${learningProgress.english.lastUpdate})
+           - 政治: ${learningProgress.politics.content || '暂无记录'} (更新于 ${learningProgress.politics.lastUpdate})
+           - 数学: ${learningProgress.math.content || '暂无记录'} (更新于 ${learningProgress.math.lastUpdate})
+           - 408: ${learningProgress.cs.content || '暂无记录'} (更新于 ${learningProgress.cs.lastUpdate})
       `;
 
       if (yesterdayData) {
@@ -945,7 +963,8 @@ export default function LevelUpApp() {
         dataContext += `\n5. 昨日(${yesterdayStr})无学习记录。`;
       }
 
-      const systemContext = `${persona}\n\n${dataContext}\n\n根据以上数据，评估用户当前学习阶段（${stage.name}）的进度是正常、超前还是落后，并用你的人设给出简洁的分析、建议或鼓励。`;
+      // 提示 AI 导师根据学习内容评估进度
+      const systemContext = `${persona}\n\n${dataContext}\n\n根据以上学习内容和你的专业知识，评估用户当前学习阶段（${stage.name}）的进度是落后、正常还是超前，并用你的人设给出简洁的分析、建议或鼓励。`;
 
       const initialMsg = { role: 'system', content: systemContext };
       const triggerMsg = { role: 'user', content: "导师，请评估我当前的整体学习情况和进度。" };
@@ -956,17 +975,28 @@ export default function LevelUpApp() {
     }
   };
 
+  // 修改 handleUserSend 中的上下文快照
   const handleUserSend = () => {
     if (!chatInput.trim()) return;
     const newMsg = { role: 'user', content: chatInput };
     
-    // 在发送用户消息前，将最新的系统上下文作为隐藏的 system 消息插入
     const persona = customPersona.trim() || DEFAULT_PERSONA;
-    const target = customTargetHours || stage.targetHours;
-    const currentContext = { role: 'system', content: `${persona}\n\n[实时数据快照 - 学习进度: 英语${learningProgress.english.progress}%, 政治${learningProgress.politics.progress}%, 数学${learningProgress.math.progress}%, 408${learningProgress.cs.progress}%。今日已学: ${(todayStats.studyMinutes / 60).toFixed(1)}h。]`};
+    
+    // 每次发送用户消息时，携带最新的进度板快照（摘要形式）
+    // 截取前50个字符作为摘要，以减少 token 消耗
+    const getSummary = (content) => content ? content.trim().substring(0, 50) + (content.length > 50 ? '...' : '') : '暂无记录';
 
-    const updatedHistory = [...chatMessages, currentContext, newMsg]; // 每次发送都带上最新的数据快照
-    setChatMessages(prev => [...prev, newMsg]); // 仅显示用户消息
+    const progressSummary = `
+      英语: ${getSummary(learningProgress.english.content)} | 
+      数学: ${getSummary(learningProgress.math.content)} | 
+      政治: ${getSummary(learningProgress.politics.content)} |
+      408: ${getSummary(learningProgress.cs.content)}
+    `;
+    
+    const currentContext = { role: 'system', content: `${persona}\n\n[实时数据快照 - 关键进度摘要: ${progressSummary.trim().replace(/\s+/g, ' ')}。今日已学: ${(todayStats.studyMinutes / 60).toFixed(1)}h。]`};
+
+    const updatedHistory = [...chatMessages, currentContext, newMsg];
+    setChatMessages(prev => [...prev, newMsg]);
     setChatInput('');
     setShowEmojiPicker(false);
     sendToAI(updatedHistory);
@@ -1015,10 +1045,10 @@ export default function LevelUpApp() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(20,20,40,0.4),transparent_70%)] pointer-events-none"></div>
       <div className="absolute inset-0 opacity-5 pointer-events-none mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
 
-      {/* 桌面端侧边栏 */}
-      <div className={`hidden md:flex flex-col w-96 bg-[#111116] border-r border-gray-800 p-6 gap-4 overflow-y-auto z-20 h-full relative group`}>
+      {/* 桌面端侧边栏 - 已设置 h-full 和 overflow-y-auto 实现滚动 */}
+      <div className={`hidden md:flex flex-col w-96 bg-[#111116] border-r border-gray-800 p-6 gap-4 overflow-y-auto z-20 h-full relative group scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent`}>
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-purple-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-        <div className="flex justify-between items-start relative z-10">
+        <div className="flex justify-between items-start relative z-10 flex-shrink-0">
           <div>
             <h1 className="text-3xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 drop-shadow-[0_0_10px_rgba(0,255,255,0.3)]">LEVEL UP!</h1>
             <p className="text-[10px] text-gray-500 font-mono flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500"/> CHAT COACH EDITION</p>
@@ -1026,26 +1056,26 @@ export default function LevelUpApp() {
           <button onClick={() => setShowSettings(!showSettings)} className="text-gray-500 hover:text-white transition p-1 hover:bg-gray-800 rounded-full"><Settings className="w-5 h-5" /></button>
         </div>
 
-        <button onClick={startAICoach} className="w-full relative overflow-hidden group bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/30 hover:border-purple-400 text-white font-bold py-3 rounded-xl shadow-[0_0_20px_rgba(139,92,246,0.2)] flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02]">
+        <button onClick={startAICoach} className="w-full relative overflow-hidden group bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/30 hover:border-purple-400 text-white font-bold py-3 rounded-xl shadow-[0_0_20px_rgba(139,92,246,0.2)] flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] flex-shrink-0">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-400/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
           <MessageCircle className="w-5 h-5 text-purple-400 group-hover:text-white transition-colors" /> <span className="relative z-10">进入 AI 导师通信终端</span>
         </button>
 
         {showSettings && (
-          <div className="bg-[#1a1a20] border border-gray-700 rounded-lg p-4 text-xs animate-in fade-in slide-in-from-top-2 space-y-4 relative z-50">
-            {/* AI Settings (Omitted for brevity, assumed unchanged) */}
+          <div className="bg-[#1a1a20] border border-gray-700 rounded-lg p-4 text-xs animate-in fade-in slide-in-from-top-2 space-y-4 relative z-50 flex-shrink-0">
+            {/* AI Settings - 桌面端侧边栏已包含配置 */}
           </div>
         )}
         
-        {/* 新增：学习进度面板 (Feature 4 - Desktop) */}
+        {/* 新增：学习进度面板 (内容已修改) */}
         <LearningProgressPanel 
           learningProgress={learningProgress} 
           onProgressUpdate={handleProgressUpdate}
           isMobileView={false}
         />
 
-        {/* 状态卡片 (保持不变) */}
-        <div className={`rounded-xl p-3 md:p-4 border-l-4 ${stage.borderColor} ${stage.bg} relative overflow-hidden z-0`}>
+        {/* 状态卡片 */}
+        <div className={`rounded-xl p-3 md:p-4 border-l-4 ${stage.borderColor} ${stage.bg} relative overflow-hidden z-0 flex-shrink-0`}>
           <div className="flex items-center gap-2 mb-1 relative z-10"><Target className={`w-4 h-4 ${stage.color}`} /><span className={`text-xs font-bold ${stage.color} tracking-widest uppercase`}>STAGE: {stage.name}</span></div>
           <div className="pl-6 relative z-10">
             <div className="flex justify-between text-xs mb-1 text-gray-400">
@@ -1060,8 +1090,8 @@ export default function LevelUpApp() {
           </div>
         </div>
         
-        {/* 日志列表 + 手动补录按钮 (保持不变) */}
-        <div className="flex items-center justify-between px-1 mt-2 mb-1 relative z-0">
+        {/* 日志列表 + 手动补录按钮 */}
+        <div className="flex items-center justify-between px-1 mt-2 mb-1 relative z-0 flex-shrink-0">
             <span className="text-xs font-bold text-gray-500">TODAY'S LOGS</span>
             <button 
               onClick={openManualLog}
@@ -1071,6 +1101,7 @@ export default function LevelUpApp() {
             </button>
         </div>
 
+        {/* 日志列表容器 - flex-1 确保它占据剩余空间并可滚动 */}
         <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-1 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent relative z-0">
            {todayStats.logs && todayStats.logs.slice().reverse().map((log, i) => (
              <div key={i} className="bg-[#1a1a20] p-3 rounded border-l-2 border-emerald-500/50 text-xs text-gray-300 relative group hover:bg-[#222228] transition-colors">
@@ -1081,7 +1112,7 @@ export default function LevelUpApp() {
         </div>
       </div>
 
-      {/* 移动端底部导航 */}
+      {/* 移动端底部导航 (保持不变) */}
       <MobileNav 
         mode={mode}
         switchMode={switchMode}
@@ -1094,7 +1125,7 @@ export default function LevelUpApp() {
         openManualLog={openManualLog}
       />
 
-      {/* Main Timer Area */}
+      {/* Main Timer Area (保持不变) */}
       <div className={`flex-1 flex flex-col items-center justify-center p-4 relative bg-gradient-to-br ${getBgColor()} transition-colors duration-1000 overflow-hidden pb-20 md:pb-4`}>
         
         {/* 移动端视图切换 (主页) */}
@@ -1121,7 +1152,7 @@ export default function LevelUpApp() {
           </div>
         </div>
 
-        {/* 移动端数据视图 (Feature 4 - Mobile) */}
+        {/* 移动端数据视图 */}
         <div className={`md:hidden w-full space-y-4 pt-4 overflow-y-auto ${activeView !== 'stats' ? 'hidden' : ''}`}>
           <div className="bg-[#111116] rounded-xl p-4 border border-gray-800">
             <div className="flex items-center gap-2 mb-3">
@@ -1181,7 +1212,7 @@ export default function LevelUpApp() {
           </div>
         </div>
 
-        {/* 计时器视图 */}
+        {/* 计时器视图 (保持不变) */}
         <div className={`${activeView === 'timer' ? 'flex' : 'hidden md:flex'} flex-col items-center w-full`}>
           <div className={`absolute top-4 right-4 z-30 transition-opacity duration-300 flex items-center gap-4 ${isZen && isActive ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}>
             {isZen && <button onClick={() => setIsZen(false)} className="bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white px-3 py-2 rounded text-xs transition">
@@ -1450,7 +1481,7 @@ export default function LevelUpApp() {
         </div>
       )}
 
-      {/* Settings Modal (Re-include the setting content for completeness, only necessary parts shown here) */}
+      {/* Settings Modal (保持不变) */}
       {showSettings && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in zoom-in duration-200">
             <div className="bg-[#111116] w-full h-full md:max-w-xl md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800 p-6 md:p-8">
