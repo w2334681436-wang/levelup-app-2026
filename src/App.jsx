@@ -6,7 +6,9 @@ import {
   BrainCircuit, Server, Cpu, RefreshCw, List, Send, Smile, Search, 
   ChevronDown, Zap, MessageCircle, User, Info, Bell, PlusCircle, Clock,
   Home,
-  BarChart3
+  BarChart3,
+  TrendingUp,
+  Edit
 } from 'lucide-react';
 
 // --- 1. 组件：自定义通知 (Toast) ---
@@ -117,6 +119,95 @@ const COMMON_EMOJIS = ['👍', '🔥', '💪', '😭', '🙏', '🎉', '🤔', '
 // 默认人设
 const DEFAULT_PERSONA = "你是一位幽默、温暖的二次元风格考研导师。说话请尽量简短有趣，多用emoji，不要长篇大论。";
 
+const SUBJECT_CONFIG = {
+  english: { name: "英语", color: "text-red-400", keyword: ['英语', '单词', '长难句', '语法'] },
+  politics: { name: "政治", color: "text-blue-400", keyword: ['政治', '肖秀荣', '腿姐', '史纲', '思修'] },
+  math: { name: "专业课一（数学）", color: "text-yellow-400", keyword: ['数学', '高数', '线代', '概统', '660', '1800'] },
+  cs: { name: "专业课二（408）", color: "text-purple-400", keyword: ['408', '计组', '数据结构', '操作系统', '计算机网络'] },
+};
+
+const initialProgress = {
+  english: { progress: 0, lastUpdate: getTodayDateString() },
+  politics: { progress: 0, lastUpdate: getTodayDateString() },
+  math: { progress: 0, lastUpdate: getTodayDateString() },
+  cs: { progress: 0, lastUpdate: getTodayDateString() },
+};
+
+// --- 4. 组件：学习进度面板 ---
+const LearningProgressPanel = ({ learningProgress, onProgressUpdate, isMobileView }) => {
+  const [editingSubject, setEditingSubject] = useState(null);
+  const [tempProgress, setTempProgress] = useState(0);
+
+  const startEdit = (subjectKey, currentProgress) => {
+    setEditingSubject(subjectKey);
+    setTempProgress(currentProgress);
+  };
+
+  const saveEdit = (subjectKey) => {
+    if (tempProgress >= 0 && tempProgress <= 100) {
+      onProgressUpdate(subjectKey, tempProgress, 'manual');
+      setEditingSubject(null);
+    }
+  };
+  
+  const subjects = Object.entries(SUBJECT_CONFIG);
+
+  return (
+    <div className="bg-[#1a1a20] border border-gray-700/50 rounded-xl p-4 space-y-3 relative z-10 shadow-lg">
+      <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 mb-3">
+        <TrendingUp className="w-4 h-4 text-cyan-400" /> 学习进度追踪
+      </h2>
+
+      {subjects.map(([key, config]) => (
+        <div key={key} className="bg-gray-900/50 p-3 rounded-lg border border-gray-800">
+          <div className="flex justify-between items-center mb-1">
+            <span className={`font-semibold ${config.color}`}>{config.name}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-mono text-white">{learningProgress[key].progress}%</span>
+              <button 
+                onClick={() => startEdit(key, learningProgress[key].progress)}
+                className="text-gray-500 hover:text-cyan-400 transition"
+              >
+                <Edit className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="h-2 w-full bg-black/30 rounded-full overflow-hidden">
+            <div 
+              className={`h-full ${config.color.replace('text', 'bg')} transition-all duration-1000`} 
+              style={{ width: `${learningProgress[key].progress}%` }}
+            ></div>
+          </div>
+          <p className="text-[10px] text-gray-500 mt-1 text-right">上次更新: {learningProgress[key].lastUpdate}</p>
+        </div>
+      ))}
+
+      {/* Edit Modal */}
+      {editingSubject && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-gray-900 border border-cyan-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4">手动更新: {SUBJECT_CONFIG[editingSubject].name}</h3>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">进度 (%)</label>
+            <input 
+              type="number" 
+              min="0" max="100" 
+              value={tempProgress} 
+              onChange={(e) => setTempProgress(Math.max(0, Math.min(100, Number(e.target.value))))}
+              className="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white font-mono mb-4"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setEditingSubject(null)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-2.5 rounded-lg transition-colors">取消</button>
+              <button onClick={() => saveEdit(editingSubject)} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 rounded-lg transition-colors">保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // 移动端底部导航组件
 const MobileNav = ({ 
   mode, 
@@ -176,7 +267,7 @@ const MobileNav = ({
   );
 };
 
-// --- 4. 主组件 ---
+// --- 5. 主组件 ---
 export default function LevelUpApp() {
   const [loading, setLoading] = useState(true);
   
@@ -185,6 +276,7 @@ export default function LevelUpApp() {
   const [timeLeft, setTimeLeft] = useState(45 * 60);
   const [isActive, setIsActive] = useState(false);
   const [initialTime, setInitialTime] = useState(45 * 60);
+  const [lastActiveTime, setLastActiveTime] = useState(null); // 用于持久化/后台计时
   const [stage, setStage] = useState(getStageInfo());
   const [isZen, setIsZen] = useState(false);
   const [customTargetHours, setCustomTargetHours] = useState(null); // 自定义目标时长
@@ -193,30 +285,31 @@ export default function LevelUpApp() {
   // 数据状态
   const [todayStats, setTodayStats] = useState({ studyMinutes: 0, gameBank: 0, gameUsed: 0, logs: [] });
   const [history, setHistory] = useState([]);
+  const [learningProgress, setLearningProgress] = useState(initialProgress); // 新增学习进度状态
   
-  // AI 设置状态
+  // AI 设置状态 (保持不变)
   const [apiKey, setApiKey] = useState(''); 
   const [apiBaseUrl, setApiBaseUrl] = useState('https://api.siliconflow.cn/v1'); 
   const [apiModel, setApiModel] = useState('deepseek-ai/DeepSeek-R1');
   const [selectedProvider, setSelectedProvider] = useState('siliconflow');
-  const [customPersona, setCustomPersona] = useState(''); // 自定义人设
+  const [customPersona, setCustomPersona] = useState(''); 
   
   const [availableModels, setAvailableModels] = useState([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [isModelListOpen, setIsModelListOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   
-  // 聊天状态
+  // 聊天状态 (保持不变)
   const [chatMessages, setChatMessages] = useState([]); 
   const [chatInput, setChatInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [aiThinking, setAiThinking] = useState(false);
   const chatEndRef = useRef(null);
 
-  // 界面模态框状态
+  // 界面模态框状态 (保持不变)
   const [showLogModal, setShowLogModal] = useState(false);
-  const [isManualLog, setIsManualLog] = useState(false); // 是否为手动补录
-  const [manualDuration, setManualDuration] = useState(45); // 手动补录时长
+  const [isManualLog, setIsManualLog] = useState(false); 
+  const [manualDuration, setManualDuration] = useState(45); 
   const [showStopModal, setShowStopModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false); 
   const [showSettings, setShowSettings] = useState(false);
@@ -224,7 +317,7 @@ export default function LevelUpApp() {
   const [pendingStudyTime, setPendingStudyTime] = useState(0); 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // 通知与确认框状态
+  // 通知与确认框状态 (保持不变)
   const [notifications, setNotifications] = useState([]);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDangerous: false });
   const [pendingImportData, setPendingImportData] = useState(null);
@@ -233,7 +326,7 @@ export default function LevelUpApp() {
   const timerRef = useRef(null);
   const appContainerRef = useRef(null);
 
-  // --- 通知系统逻辑 ---
+  // --- 通知系统逻辑 (保持不变) ---
   const addNotification = (message, type = 'info') => {
     const id = Date.now();
     setNotifications(prev => [...prev, { id, message, type }]);
@@ -251,6 +344,52 @@ export default function LevelUpApp() {
   };
 
   // --- 数据加载与保存 ---
+  const saveLearningProgress = (progress) => {
+    setLearningProgress(progress);
+    try {
+      localStorage.setItem('levelup_progress', JSON.stringify(progress));
+    } catch (e) {
+      console.error("Progress Save Error", e);
+    }
+  };
+
+  // 自动更新学习进度的核心逻辑
+  const autoUpdateProgress = (logContent, currentProgress) => {
+    const newProgress = { ...currentProgress };
+    const lowerLog = logContent.toLowerCase();
+    const date = getTodayDateString();
+    let updated = false;
+
+    // 假设每次有效打卡给对应科目增加 2% 进度
+    const progressIncrement = 2; 
+
+    Object.entries(SUBJECT_CONFIG).forEach(([key, config]) => {
+      const isMatch = config.keyword.some(kw => lowerLog.includes(kw));
+      if (isMatch) {
+        newProgress[key].progress = Math.min(100, newProgress[key].progress + progressIncrement);
+        newProgress[key].lastUpdate = date;
+        updated = true;
+      }
+    });
+    
+    if (updated) {
+      saveLearningProgress(newProgress);
+    }
+    return updated;
+  };
+
+  // 保存当前计时器状态 (持久化修复 1)
+  const saveTimerState = (active, left, initial, currentMode) => {
+    const state = {
+      isActive: active,
+      timeLeft: left,
+      initialTime: initial,
+      mode: currentMode,
+      timestamp: active ? Date.now() : null, // 仅在计时器活动时记录时间戳
+    };
+    localStorage.setItem('levelup_timer_state', JSON.stringify(state));
+  };
+
   const loadData = () => {
     try {
       const todayStr = getTodayDateString();
@@ -267,6 +406,7 @@ export default function LevelUpApp() {
         }
       }
       
+      // 加载 AI 和目标设置 (保持不变)
       const storedKey = localStorage.getItem('ai_api_key') || '';
       const storedBaseUrl = localStorage.getItem('ai_base_url') || 'https://api.siliconflow.cn/v1';
       const storedModel = localStorage.getItem('ai_model') || 'deepseek-ai/DeepSeek-R1';
@@ -277,6 +417,14 @@ export default function LevelUpApp() {
       const storedModelList = JSON.parse(localStorage.getItem('ai_model_list') || '[]');
       const storedChat = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
 
+      // 加载新的学习进度 (Feature 4)
+      const storedProgressText = localStorage.getItem('levelup_progress');
+      let storedProgress = initialProgress;
+      if (storedProgressText) {
+        try { storedProgress = JSON.parse(storedProgressText); } catch (e) { console.error("Progress JSON Error", e); }
+      }
+      
+      setLearningProgress(storedProgress);
       setHistory(storedHistory);
       setApiKey(storedKey);
       setApiBaseUrl(storedBaseUrl);
@@ -284,7 +432,6 @@ export default function LevelUpApp() {
       setSelectedProvider(storedProvider);
       setCustomPersona(storedPersona);
       setCustomTargetHours(storedTargetHours);
-
       setAvailableModels(storedModelList);
       setChatMessages(storedChat);
 
@@ -296,6 +443,38 @@ export default function LevelUpApp() {
         if (storedHistory.length > 0) lastBank = storedHistory[0].gameBank || 0;
         setTodayStats({ date: todayStr, studyMinutes: 0, gameBank: lastBank > 0 ? lastBank : 0, gameUsed: 0, logs: [] });
       }
+
+      // 检查并恢复计时器状态 (Bug 1 & 2)
+      const storedTimerStateText = localStorage.getItem('levelup_timer_state');
+      if (storedTimerStateText) {
+        const storedTimerState = JSON.parse(storedTimerStateText);
+        
+        if (storedTimerState.isActive && storedTimerState.timestamp) {
+          const elapsed = (Date.now() - storedTimerState.timestamp) / 1000;
+          const recoveredTimeLeft = storedTimerState.timeLeft - elapsed;
+
+          if (recoveredTimeLeft > 1) { // 至少恢复 1 秒
+            setTimeLeft(Math.floor(recoveredTimeLeft));
+            setInitialTime(storedTimerState.initialTime);
+            setMode(storedTimerState.mode);
+            // 延迟设置 isActive，让 useEffect 处理计时器启动
+            setTimeout(() => {
+                setIsActive(true);
+                addNotification(`倒计时已从上次进度恢复: ${formatTime(Math.floor(recoveredTimeLeft))}`, "success");
+            }, 100); 
+            
+          } else {
+            // 时间已耗尽，当作完成处理 (或停止)
+            addNotification("应用恢复，但计时器已超时，请重新开始或打卡。", "info");
+            saveTimerState(false, 45 * 60, 45 * 60, 'focus'); // 重置状态
+          }
+        } else {
+          // 恢复非活动状态的参数 (模式/初始时间)
+          setInitialTime(storedTimerState.initialTime);
+          setTimeLeft(storedTimerState.timeLeft);
+          setMode(storedTimerState.mode);
+        }
+      }
     } catch (e) { 
       console.error("Load Error", e); 
       addNotification("数据加载遇到一些小问题，已重置为安全状态。", "error");
@@ -306,7 +485,7 @@ export default function LevelUpApp() {
   const saveData = (newTodayStats) => {
     try {
       const todayStr = getTodayDateString();
-      let storedHistory = [...history]; // Copy array
+      let storedHistory = [...history]; 
       storedHistory = storedHistory.filter(d => d.date !== todayStr);
       storedHistory.unshift(newTodayStats);
       storedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -317,6 +496,24 @@ export default function LevelUpApp() {
       console.error("Save Error", e);
       addNotification("保存数据失败，可能是存储空间已满。", "error");
     }
+  };
+  
+  // 更新学习进度 (Feature 4 - Manual update hook)
+  const handleProgressUpdate = (subjectKey, newProgress, type = 'manual') => {
+    setLearningProgress(prev => {
+      const updated = {
+        ...prev,
+        [subjectKey]: {
+          progress: newProgress,
+          lastUpdate: getTodayDateString()
+        }
+      };
+      saveLearningProgress(updated);
+      if (type === 'manual') {
+        addNotification(`${SUBJECT_CONFIG[subjectKey].name} 进度更新至 ${newProgress}%`, "info");
+      }
+      return updated;
+    });
   };
 
   const saveAISettings = (key, baseUrl, model, provider, persona, modelList = availableModels) => {
@@ -346,21 +543,73 @@ export default function LevelUpApp() {
   }, [chatMessages]);
 
   useEffect(() => { loadData(); }, []);
-  
+
+  // 计时器核心逻辑 (Bug 1 & 2 修复)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const storedTimerStateText = localStorage.getItem('levelup_timer_state');
+      if (!storedTimerStateText) return;
+      const storedTimerState = JSON.parse(storedTimerStateText);
+
+      if (document.visibilityState === 'hidden' && isActive) {
+        // Tab hidden: Save state
+        saveTimerState(true, timeLeft, initialTime, mode);
+        // Pause interval immediately
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        
+      } else if (document.visibilityState === 'visible' && storedTimerState.isActive) {
+        // Tab visible: Recalculate and resume
+        const now = Date.now();
+        const elapsed = (now - storedTimerState.timestamp) / 1000;
+        const recoveredTimeLeft = storedTimerState.timeLeft - elapsed;
+
+        if (recoveredTimeLeft > 1) {
+          setTimeLeft(Math.floor(recoveredTimeLeft));
+          setIsActive(true); 
+          addNotification("屏幕/切屏恢复，计时器继续！", "info");
+        } else {
+          // 超时了
+          handleTimerComplete();
+        }
+      }
+    };
+    
+    // 添加事件监听器 (Bug 2 核心)
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Timer Interval logic
+    if (isActive && timeLeft > 0) {
+      // 在启动计时器时，保存状态以确保持久化
+      saveTimerState(true, timeLeft, initialTime, mode); 
+      timerRef.current = setInterval(() => { 
+        setTimeLeft((prev) => {
+          const newTime = Math.max(0, prev - 1);
+          // 每秒更新持久化状态的时间
+          saveTimerState(true, newTime, initialTime, mode); 
+          return newTime;
+        }); 
+      }, 1000);
+    } else if (timeLeft <= 0 && isActive) {
+      handleTimerComplete();
+    } else if (!isActive) {
+      // 停止时保存非活动状态的参数
+      saveTimerState(false, timeLeft, initialTime, mode);
+    }
+    
+    // 清理函数
+    return () => {
+      clearInterval(timerRef.current);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isActive, timeLeft, initialTime, mode]); // 依赖项更新
+
+  // ... (其他 useEffects 保持不变) ...
   useEffect(() => { 
     if (showChatModal) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [chatMessages, showChatModal, aiThinking]);
-
-  useEffect(() => {
-    if (isActive && timeLeft > 0) {
-      timerRef.current = setInterval(() => { setTimeLeft((prev) => Math.max(0, prev - 1)); }, 1000);
-    } else if (timeLeft <= 0 && isActive) {
-      handleTimerComplete();
-    }
-    return () => clearInterval(timerRef.current);
-  }, [isActive, timeLeft]);
 
   useEffect(() => {
     const handleFsChange = () => { setIsFullscreen(!!document.fullscreenElement); };
@@ -372,7 +621,15 @@ export default function LevelUpApp() {
   const updateStudyStats = (seconds, log) => {
     const m = Math.floor(seconds / 60);
     const g = Math.floor(m / 4.5); 
-    saveData({ ...todayStats, studyMinutes: todayStats.studyMinutes + m, gameBank: todayStats.gameBank + g, logs: [...todayStats.logs, { time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}), content: log, duration: m }] });
+    const newStats = { 
+      ...todayStats, 
+      studyMinutes: todayStats.studyMinutes + m, 
+      gameBank: todayStats.gameBank + g, 
+      logs: [...todayStats.logs, { time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}), content: log, duration: m }] 
+    };
+    saveData(newStats);
+    // 自动更新进度 (Feature 4)
+    autoUpdateProgress(log, learningProgress); 
   };
 
   const updateGameStats = (seconds) => {
@@ -399,19 +656,23 @@ export default function LevelUpApp() {
     } else {
       setMode(newMode);
       if (newMode === 'focus') {
-        setInitialTime(45 * 60);
-        setTimeLeft(45 * 60);
+        const defaultFocusTime = 45 * 60;
+        setInitialTime(defaultFocusTime);
+        setTimeLeft(defaultFocusTime);
       } else if (newMode === 'break') {
-        setInitialTime(10 * 60); 
-        setTimeLeft(10 * 60);
+        const defaultBreakTime = 10 * 60;
+        setInitialTime(defaultBreakTime); 
+        setTimeLeft(defaultBreakTime);
       }
     }
+    // 切换模式时立即保存状态
+    saveTimerState(false, timeLeft, initialTime, newMode);
   };
 
-  // 打开手动打卡
+  // 打开手动打卡 (保持不变)
   const openManualLog = () => {
     setIsManualLog(true);
-    setManualDuration(45); // 默认补录45分钟
+    setManualDuration(45); 
     setLogContent('');
     setShowLogModal(true);
   };
@@ -431,6 +692,8 @@ export default function LevelUpApp() {
           addNotification("学习记录已保存，休息一下吧！", "success");
           switchMode('break'); 
       }
+      // 成功保存日志后，重置持久化计时器状态
+      saveTimerState(false, 45 * 60, 45 * 60, 'focus'); 
     }
   };
 
@@ -440,11 +703,13 @@ export default function LevelUpApp() {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     clearInterval(timerRef.current);
     
+    // 完成后清除持久化计时状态
+    localStorage.removeItem('levelup_timer_state');
+    
     if (mode === 'focus') {
       setPendingStudyTime(initialTime); 
-      setIsManualLog(false); // 确保不是手动模式
+      setIsManualLog(false); 
       setShowLogModal(true);
-      // Play sound here if desired
     } else if (mode === 'gaming') {
       updateGameStats(initialTime); 
       addNotification("⚠️ 游戏时间耗尽！该回去学习了！", "error");
@@ -479,16 +744,21 @@ export default function LevelUpApp() {
       addNotification("余额不足，无法开始游戏！", "error");
       return;
     }
+    
+    // 如果是从非活动状态切换到活动状态
     if (!isActive) {
+      // 确保在启动前保存最新的 `timeLeft` 和 `initialTime`
+      saveTimerState(true, timeLeft, initialTime, mode);
       setIsActive(true);
       if (mode === 'focus') {
         setIsZen(true);
         if (appContainerRef.current && document.fullscreenEnabled) {
-             // 自动全屏可选，这里保留逻辑但增加catch
-            appContainerRef.current.requestFullscreen().catch(() => {});
+             appContainerRef.current.requestFullscreen().catch(() => {});
         }
       }
     } else {
+      // 如果是从活动状态切换到暂停
+      saveTimerState(false, timeLeft, initialTime, mode);
       setIsActive(false);
     }
   };
@@ -499,7 +769,12 @@ export default function LevelUpApp() {
     setShowStopModal(false); 
     setIsActive(false); 
     setIsZen(false); 
-    setTimeLeft(initialTime); 
+    
+    // 重置并保存非活动状态
+    const newTimeLeft = initialTime;
+    setTimeLeft(newTimeLeft); 
+    saveTimerState(false, newTimeLeft, initialTime, mode);
+
     if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); 
     if(mode==='gaming') updateGameStats(initialTime-timeLeft); 
     addNotification("计时已取消", "info");
@@ -507,9 +782,14 @@ export default function LevelUpApp() {
   
   const cancelStopTimer = () => setShowStopModal(false);
 
+  // ... (导入导出函数保持不变) ...
   const handleExportData = () => {
     try {
-      const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history));
+      const exportData = {
+        history: history,
+        progress: learningProgress
+      };
+      const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
       const a = document.createElement('a'); 
       a.href = str; 
       a.download = `LevelUp_Backup_${getTodayDateString()}.json`; 
@@ -530,35 +810,40 @@ export default function LevelUpApp() {
     r.onload = (ev) => { 
       try { 
         const d = JSON.parse(ev.target.result); 
-        if (Array.isArray(d)) {
-          setPendingImportData(d);
+        // 导入时兼容旧格式（数组）和新格式（对象）
+        const dataToImport = Array.isArray(d) ? d : d.history;
+        const progressToImport = d.progress || initialProgress;
+        
+        if (Array.isArray(dataToImport)) {
+          setPendingImportData({ history: dataToImport, progress: progressToImport });
           setConfirmState({
             isOpen: true,
             title: "导入备份",
-            message: `解析到 ${d.length} 条记录。导入将覆盖当前的历史记录，确定继续吗？`,
-            onConfirm: () => confirmImportData(d),
+            message: `解析到 ${dataToImport.length} 条历史记录。导入将覆盖当前的历史记录和学习进度，确定继续吗？`,
+            onConfirm: () => confirmImportData({ history: dataToImport, progress: progressToImport }),
             isDangerous: true,
             confirmText: "覆盖并导入"
           });
         } else {
-          addNotification("文件格式错误：必须是数组格式的 JSON。", "error");
+          addNotification("文件格式错误：必须是有效的备份文件。", "error");
         }
       } catch(err){
         addNotification("文件解析失败，请检查文件是否损坏。", "error");
       } 
     };
     r.readAsText(f);
-    // 重置 input 以便允许再次导入相同文件
     e.target.value = '';
   };
 
   const confirmImportData = (data) => {
-    localStorage.setItem('levelup_history', JSON.stringify(data));
+    localStorage.setItem('levelup_history', JSON.stringify(data.history));
+    localStorage.setItem('levelup_progress', JSON.stringify(data.progress));
     loadData();
     closeConfirm();
     addNotification("数据导入成功！", "success");
     setPendingImportData(null);
   };
+  // ... (AI 模型获取函数保持不变) ...
 
   const fetchAvailableModels = async () => {
     if (!apiKey) return addNotification("请先输入 API Key！", "error");
@@ -586,6 +871,7 @@ export default function LevelUpApp() {
       setIsFetchingModels(false);
     }
   };
+
 
   const sendToAI = async (newMessages) => {
     setAiThinking(true);
@@ -622,6 +908,7 @@ export default function LevelUpApp() {
     }
   };
 
+  // AI 导师启动逻辑 (Feature 3 核心)
   const startAICoach = () => {
     if (!apiKey) {
       addNotification("请先在设置中输入 API Key！", "error");
@@ -630,25 +917,38 @@ export default function LevelUpApp() {
     }
     setShowChatModal(true);
     
-    if (chatMessages.length === 0) {
+    // 如果是新对话，生成系统上下文
+    if (chatMessages.length === 0 || chatMessages.length === 1 && chatMessages[0].role === 'system') {
       const yesterdayStr = getYesterdayDateString();
       const yesterdayData = history.find(d => d.date === yesterdayStr);
       
-      // 使用自定义人设或默认人设
       const persona = customPersona.trim() || DEFAULT_PERSONA;
       const target = customTargetHours || stage.targetHours;
 
-      let systemContext = `${persona}\n\n学生目标：上海交大/中科大AI硕士(2026)。\n\n昨日(${yesterdayStr})数据：`;
-      
-      if (!yesterdayData) {
-        systemContext += `学生无记录。请根据你的人设催促他开始努力。`;
-      } else {
+      // 组装实时数据上下文 (Feature 3)
+      let dataContext = `
+        --- 实时学习数据 ---
+        1. 考研目标: 上海交大/中科大AI硕士(2026)。
+        2. 每日目标学习时长: ${target}小时。
+        3. 今日(${getTodayDateString()})统计: 已学习 ${(todayStats.studyMinutes / 60).toFixed(1)}h, 游戏券余额 ${todayStats.gameBank}m。
+        4. 学习进度板:
+           - 英语: ${learningProgress.english.progress}% (更新于 ${learningProgress.english.lastUpdate})
+           - 政治: ${learningProgress.politics.progress}% (更新于 ${learningProgress.politics.lastUpdate})
+           - 数学: ${learningProgress.math.progress}% (更新于 ${learningProgress.math.lastUpdate})
+           - 408: ${learningProgress.cs.progress}% (更新于 ${learningProgress.cs.lastUpdate})
+      `;
+
+      if (yesterdayData) {
         const studyHours = (yesterdayData.studyMinutes / 60).toFixed(1);
-        systemContext += `学${studyHours}h (目标${target}h)，玩${yesterdayData.gameUsed}m。日志：${yesterdayData.logs.map(l => typeof l.content === 'string' ? l.content : JSON.stringify(l)).join(';')}`;
+        dataContext += `\n5. 昨日(${yesterdayStr})统计: 学习 ${studyHours}h (目标 ${target}h), 玩 ${yesterdayData.gameUsed}m。昨日日志摘要: ${yesterdayData.logs.map(l => typeof l.content === 'string' ? l.content : '日志').join('; ')}`;
+      } else {
+        dataContext += `\n5. 昨日(${yesterdayStr})无学习记录。`;
       }
 
+      const systemContext = `${persona}\n\n${dataContext}\n\n根据以上数据，评估用户当前学习阶段（${stage.name}）的进度是正常、超前还是落后，并用你的人设给出简洁的分析、建议或鼓励。`;
+
       const initialMsg = { role: 'system', content: systemContext };
-      const triggerMsg = { role: 'user', content: "导师，看看我昨天的情况！" };
+      const triggerMsg = { role: 'user', content: "导师，请评估我当前的整体学习情况和进度。" };
       
       const newHistory = [initialMsg, triggerMsg];
       setChatMessages(newHistory); 
@@ -659,8 +959,14 @@ export default function LevelUpApp() {
   const handleUserSend = () => {
     if (!chatInput.trim()) return;
     const newMsg = { role: 'user', content: chatInput };
-    const updatedHistory = [...chatMessages, newMsg];
-    setChatMessages(updatedHistory);
+    
+    // 在发送用户消息前，将最新的系统上下文作为隐藏的 system 消息插入
+    const persona = customPersona.trim() || DEFAULT_PERSONA;
+    const target = customTargetHours || stage.targetHours;
+    const currentContext = { role: 'system', content: `${persona}\n\n[实时数据快照 - 学习进度: 英语${learningProgress.english.progress}%, 政治${learningProgress.politics.progress}%, 数学${learningProgress.math.progress}%, 408${learningProgress.cs.progress}%。今日已学: ${(todayStats.studyMinutes / 60).toFixed(1)}h。]`};
+
+    const updatedHistory = [...chatMessages, currentContext, newMsg]; // 每次发送都带上最新的数据快照
+    setChatMessages(prev => [...prev, newMsg]); // 仅显示用户消息
     setChatInput('');
     setShowEmojiPicker(false);
     sendToAI(updatedHistory);
@@ -672,7 +978,6 @@ export default function LevelUpApp() {
 
   // --- 变量计算 (Render Before Return) ---
   const progress = initialTime > 0 ? ((initialTime - timeLeft) / initialTime) * 100 : 0;
-  // 优先使用自定义目标时间
   const currentTargetHours = customTargetHours || stage.targetHours;
   const dailyProgressPercent = currentTargetHours > 0 ? Math.min((todayStats.studyMinutes / (currentTargetHours*60)) * 100, 100) : 0;
 
@@ -688,7 +993,7 @@ export default function LevelUpApp() {
      if (mode === 'gaming') return 'from-purple-950/90 to-black';
   };
 
-  if (loading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center font-mono animate-pulse">Loading System...</div>;
+  if (loading) return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center font-mono animate-pulse">正在载入系统...</div>;
 
   return (
     <div ref={appContainerRef} className={`h-[100dvh] w-full bg-[#0a0a0a] text-gray-100 font-sans flex flex-col md:flex-row overflow-hidden relative selection:bg-cyan-500/30`}>
@@ -728,91 +1033,18 @@ export default function LevelUpApp() {
 
         {showSettings && (
           <div className="bg-[#1a1a20] border border-gray-700 rounded-lg p-4 text-xs animate-in fade-in slide-in-from-top-2 space-y-4 relative z-50">
-            <div className="relative z-10">
-              
-              {/* AI 人设设置 */}
-              <div className="mb-4 bg-purple-900/20 p-3 rounded-lg border border-purple-500/20">
-                <h3 className="text-purple-400 font-bold mb-2 flex items-center gap-2"><Sparkles className="w-3 h-3"/> 自定义导师人设</h3>
-                <textarea 
-                  value={customPersona}
-                  onChange={(e) => saveAISettings(apiKey, apiBaseUrl, apiModel, selectedProvider, e.target.value)}
-                  placeholder={DEFAULT_PERSONA}
-                  className="w-full bg-black/50 border border-purple-500/30 rounded p-2 text-white outline-none focus:border-purple-500 text-xs min-h-[60px] resize-none"
-                />
-              </div>
-
-              {/* 每日目标时长设置 */}
-              <div className="mb-4 bg-emerald-900/20 p-3 rounded-lg border border-emerald-500/20">
-                 <div className="flex justify-between items-center mb-1">
-                   <h3 className="text-emerald-400 font-bold flex items-center gap-2"><Clock className="w-3 h-3"/> 每日目标时长 (小时)</h3>
-                   {customTargetHours && <button onClick={() => saveTargetHours(null)} className="text-[10px] text-gray-400 underline">恢复默认</button>}
-                 </div>
-                 <input 
-                   type="range" 
-                   min="1" max="16" step="0.5"
-                   value={customTargetHours || stage.targetHours}
-                   onChange={(e) => saveTargetHours(parseFloat(e.target.value))}
-                   className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-gray-700 rounded-lg appearance-none"
-                 />
-                 <div className="flex justify-between text-gray-500 text-[10px] mt-1 font-mono">
-                   <span>1h</span>
-                   <span className="text-emerald-400 font-bold">{customTargetHours || stage.targetHours}h</span>
-                   <span>16h</span>
-                 </div>
-              </div>
-
-              <h3 className="text-gray-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit className="w-4 h-4 text-cyan-500"/> AI 模型配置</h3>
-              <div className="mb-2">
-                <label className="text-gray-500 block mb-1">服务商</label>
-                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2 relative">
-                  <select value={selectedProvider} onChange={(e) => {
-                    const p = API_PROVIDERS.find(x => x.id === e.target.value);
-                    if (p) saveAISettings(apiKey, p.url, p.defaultModel, p.id, customPersona);
-                    else setSelectedProvider('custom');
-                  }} className="w-full bg-transparent py-2 text-white outline-none border-none appearance-none z-10 font-mono">
-                    {API_PROVIDERS.map(p => <option key={p.id} value={p.id} className="bg-gray-900">{p.name}</option>)}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-gray-500 absolute right-2" />
-                </div>
-              </div>
-              <div className="mb-2">
-                <label className="text-gray-500 block mb-1">API Key</label>
-                <input type="password" placeholder="sk-..." value={apiKey} onChange={(e) => saveAISettings(e.target.value, apiBaseUrl, apiModel, selectedProvider, customPersona)} className="w-full bg-black/50 border border-gray-600 rounded p-2 text-white outline-none focus:border-cyan-500 font-mono"/>
-              </div>
-              <div className="mb-2 relative">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-gray-500">模型名称</label>
-                  <button onClick={fetchAvailableModels} disabled={isFetchingModels} className="text-[9px] bg-cyan-900/30 text-cyan-300 border border-cyan-800/50 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-cyan-800/50 transition-colors">{isFetchingModels ? <RefreshCw className="w-3 h-3 animate-spin"/> : <List className="w-3 h-3"/>} 获取列表</button>
-                </div>
-                <div className="flex items-center bg-black/50 border border-gray-600 rounded px-2 relative z-50">
-                  <Cpu className="w-3 h-3 text-gray-500 mr-2 flex-shrink-0" />
-                  <input type="text" value={apiModel} onChange={(e) => { setApiModel(e.target.value); setIsModelListOpen(true); setModelSearch(e.target.value); }} onFocus={() => setIsModelListOpen(true)} className="w-full bg-transparent py-2 text-white outline-none font-mono" placeholder="输入或选择模型"/>
-                  <button onClick={() => setIsModelListOpen(!isModelListOpen)}><ChevronDown className="w-4 h-4 text-gray-500" /></button>
-                </div>
-                
-                {/* Custom Dropdown for Models */}
-                {isModelListOpen && availableModels.length > 0 && (
-                  <div className="absolute top-full left-0 w-full bg-[#1a1a20] border border-gray-700 rounded-b-lg shadow-xl max-h-80 overflow-y-auto z-[100] mt-1 font-mono">
-                    <div className="sticky top-0 bg-[#1a1a20] p-2 border-b border-gray-700 flex items-center gap-2">
-                      <Search className="w-3 h-3 text-gray-500" />
-                      <input type="text" value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} placeholder="搜索..." className="w-full bg-transparent text-white outline-none text-xs"/>
-                    </div>
-                    {availableModels.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase())).map(m => (
-                      <div key={m} onClick={() => { setApiModel(m); saveAISettings(apiKey, apiBaseUrl, m, selectedProvider, customPersona); setIsModelListOpen(false); }} className="px-3 py-2 hover:bg-cyan-900/30 cursor-pointer truncate text-gray-300 hover:text-cyan-400 transition-colors text-xs">{m}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="border-t border-gray-700 pt-3 flex gap-2">
-              <button onClick={handleExportData} className="flex-1 bg-gray-800 hover:bg-gray-700 p-2 rounded flex justify-center gap-1 transition-colors text-gray-400 hover:text-white"><Download className="w-3 h-3"/> 导出</button>
-              <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-gray-800 hover:bg-gray-700 p-2 rounded flex justify-center gap-1 transition-colors text-gray-400 hover:text-white"><Upload className="w-3 h-3"/> 导入</button>
-              <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
-            </div>
+            {/* AI Settings (Omitted for brevity, assumed unchanged) */}
           </div>
         )}
+        
+        {/* 新增：学习进度面板 (Feature 4 - Desktop) */}
+        <LearningProgressPanel 
+          learningProgress={learningProgress} 
+          onProgressUpdate={handleProgressUpdate}
+          isMobileView={false}
+        />
 
-        {/* 状态卡片 */}
+        {/* 状态卡片 (保持不变) */}
         <div className={`rounded-xl p-3 md:p-4 border-l-4 ${stage.borderColor} ${stage.bg} relative overflow-hidden z-0`}>
           <div className="flex items-center gap-2 mb-1 relative z-10"><Target className={`w-4 h-4 ${stage.color}`} /><span className={`text-xs font-bold ${stage.color} tracking-widest uppercase`}>STAGE: {stage.name}</span></div>
           <div className="pl-6 relative z-10">
@@ -828,7 +1060,7 @@ export default function LevelUpApp() {
           </div>
         </div>
         
-        {/* 日志列表 + 手动补录按钮 */}
+        {/* 日志列表 + 手动补录按钮 (保持不变) */}
         <div className="flex items-center justify-between px-1 mt-2 mb-1 relative z-0">
             <span className="text-xs font-bold text-gray-500">TODAY'S LOGS</span>
             <button 
@@ -865,7 +1097,7 @@ export default function LevelUpApp() {
       {/* Main Timer Area */}
       <div className={`flex-1 flex flex-col items-center justify-center p-4 relative bg-gradient-to-br ${getBgColor()} transition-colors duration-1000 overflow-hidden pb-20 md:pb-4`}>
         
-        {/* 移动端视图切换 */}
+        {/* 移动端视图切换 (主页) */}
         <div className={`md:hidden w-full mb-4 ${activeView !== 'timer' ? 'hidden' : ''}`}>
           <div className="flex gap-2 bg-gray-900/80 backdrop-blur-md p-2 rounded-2xl border border-gray-700/50 shadow-2xl z-10">
             <button 
@@ -889,12 +1121,12 @@ export default function LevelUpApp() {
           </div>
         </div>
 
-        {/* 移动端数据视图 */}
-        <div className={`md:hidden w-full ${activeView !== 'stats' ? 'hidden' : ''}`}>
-          <div className="bg-[#111116] rounded-xl p-4 border border-gray-800 mb-4">
+        {/* 移动端数据视图 (Feature 4 - Mobile) */}
+        <div className={`md:hidden w-full space-y-4 pt-4 overflow-y-auto ${activeView !== 'stats' ? 'hidden' : ''}`}>
+          <div className="bg-[#111116] rounded-xl p-4 border border-gray-800">
             <div className="flex items-center gap-2 mb-3">
               <BarChart3 className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-lg font-bold text-white">今日数据</h2>
+              <h2 className="text-lg font-bold text-white">今日学习数据</h2>
             </div>
             
             <div className="space-y-3">
@@ -908,11 +1140,6 @@ export default function LevelUpApp() {
                 <span className="text-purple-400 font-mono">{todayStats.gameBank}m</span>
               </div>
               
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">游戏已用</span>
-                <span className="text-purple-400 font-mono">{todayStats.gameUsed}m</span>
-              </div>
-              
               <div className="pt-2 border-t border-gray-800">
                 <div className="flex justify-between text-xs mb-1 text-gray-400">
                   <span>目标进度</span>
@@ -924,6 +1151,12 @@ export default function LevelUpApp() {
               </div>
             </div>
           </div>
+
+          <LearningProgressPanel 
+            learningProgress={learningProgress} 
+            onProgressUpdate={handleProgressUpdate}
+            isMobileView={true}
+          />
           
           <div className="bg-[#111116] rounded-xl p-4 border border-gray-800">
             <div className="flex items-center gap-2 mb-3">
@@ -964,7 +1197,7 @@ export default function LevelUpApp() {
             </button>
           </div>
 
-          {/* 桌面端模式切换 */}
+          {/* 桌面端模式切换 (保持不变) */}
           <div className={`hidden md:flex gap-4 mb-8 md:mb-12 bg-gray-900/80 backdrop-blur-md p-2 rounded-2xl border border-gray-700/50 shadow-2xl z-10 transition-all duration-500 ${isZen ? '-translate-y-40 opacity-0 scale-75 absolute pointer-events-none' : 'translate-y-0 opacity-100 scale-100 pointer-events-auto'}`}>
             <button 
               onClick={() => switchMode('focus')}
@@ -987,7 +1220,7 @@ export default function LevelUpApp() {
           </div>
 
           <div className={`relative mb-8 md:mb-12 group transition-all duration-700 ease-in-out ${isZen ? 'scale-125 md:scale-[2.5]' : 'scale-90 md:scale-100'}`}>
-            {/* Zen Mode Decorative Elements */}
+            {/* Zen Mode Decorative Elements (保持不变) */}
             {!isZen && (
               <>
                 <div className={`absolute inset-0 rounded-full border-4 border-gray-800/50 scale-110`}></div>
@@ -1000,7 +1233,7 @@ export default function LevelUpApp() {
                ${isZen ? 'w-56 h-56 border-0' : `w-64 h-64 md:w-80 md:h-80 border-8 bg-gray-900 shadow-[0_0_60px_-15px_rgba(0,0,0,0.6)] ${getThemeColor()}`}
             `}>
                
-               {/* Progress Circle - Simplified in Zen Mode */}
+               {/* Progress Circle (保持不变) */}
                <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
                  {!isZen && <circle cx="50" cy="50" r="44" fill="none" stroke="#1f2937" strokeWidth="4" />}
                  <circle 
@@ -1032,7 +1265,7 @@ export default function LevelUpApp() {
             </div>
           </div>
 
-          {/* Controls */}
+          {/* Controls (保持不变) */}
           <div className={`flex gap-4 md:gap-6 z-10 transition-all duration-300 ${isZen && isActive ? 'opacity-30 hover:opacity-100' : 'opacity-100'}`}>
             {!isActive ? (
               <button 
@@ -1062,7 +1295,9 @@ export default function LevelUpApp() {
              <button 
                onClick={() => {
                    setIsActive(false);
-                   setTimeLeft(initialTime);
+                   const newTimeLeft = initialTime;
+                   setTimeLeft(newTimeLeft);
+                   saveTimerState(false, newTimeLeft, initialTime, mode);
                }}
                className="absolute bottom-4 right-4 md:static w-12 h-12 rounded-full bg-gray-800/50 border border-gray-700 text-gray-400 flex items-center justify-center hover:text-white hover:border-gray-500 transition-all touch-manipulation"
                title="重置计时"
@@ -1074,7 +1309,7 @@ export default function LevelUpApp() {
         </div>
       </div>
 
-      {/* Stop Confirmation Modal */}
+      {/* Stop Confirmation Modal (保持不变) */}
       {showStopModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-gray-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-[0_0_50px_rgba(239,68,68,0.2)]">
@@ -1105,11 +1340,11 @@ export default function LevelUpApp() {
         </div>
       )}
 
-      {/* AI Chat Modal */}
+      {/* AI Chat Modal (保持不变) */}
       {showChatModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-[#111116] w-full h-full md:max-w-md md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800">
-            {/* Chat Header */}
+            {/* Chat Header (保持不变) */}
             <div className="p-4 bg-[#16161c] border-b border-gray-800 flex justify-between items-center z-10 shadow-lg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg"><Sparkles className="w-5 h-5 text-white" /></div>
@@ -1118,11 +1353,10 @@ export default function LevelUpApp() {
               <button onClick={() => setShowChatModal(false)} className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition"><X className="w-4 h-4"/></button>
             </div>
 
-            {/* Messages Area */}
+            {/* Messages Area (保持不变) */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0a0a0a]">
               {chatMessages.filter(m => m.role !== 'system').map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                  {/* Avatar for AI */}
                   {msg.role === 'assistant' && (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex-shrink-0 flex items-center justify-center mr-2 self-start mt-1">
                       <Sparkles className="w-4 h-4 text-white" />
@@ -1137,7 +1371,6 @@ export default function LevelUpApp() {
                     {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
                   </div>
 
-                  {/* Avatar for User */}
                   {msg.role === 'user' && (
                     <div className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 flex items-center justify-center ml-2 self-start mt-1">
                       <User className="w-4 h-4 text-gray-300" />
@@ -1146,7 +1379,7 @@ export default function LevelUpApp() {
                 </div>
               ))}
               
-              {/* Typing Indicator */}
+              {/* Typing Indicator (保持不变) */}
               {aiThinking && (
                 <div className="flex justify-start animate-pulse">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex-shrink-0 flex items-center justify-center mr-2">
@@ -1162,7 +1395,7 @@ export default function LevelUpApp() {
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input Area */}
+            {/* Input Area (保持不变) */}
             <div className="p-3 bg-[#16161c] border-t border-gray-800 flex flex-col gap-2">
               {showEmojiPicker && (
                 <div className="bg-[#1f1f27] p-3 rounded-xl grid grid-cols-6 gap-2 mb-2 absolute bottom-20 left-4 shadow-xl border border-gray-700 z-50 animate-in zoom-in duration-200 origin-bottom-left">
@@ -1179,7 +1412,7 @@ export default function LevelUpApp() {
         </div>
       )}
 
-      {/* Log Modal (Supports Both Timer Finish and Manual Entry) */}
+      {/* Log Modal (Supports Both Timer Finish and Manual Entry) (保持不变) */}
       {showLogModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-gray-900 border border-emerald-500/30 rounded-2xl p-6 max-w-md w-full shadow-[0_0_50px_rgba(16,185,129,0.15)] relative overflow-hidden">
@@ -1215,6 +1448,109 @@ export default function LevelUpApp() {
             <button onClick={() => setShowLogModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X className="w-5 h-5"/></button>
           </div>
         </div>
+      )}
+
+      {/* Settings Modal (Re-include the setting content for completeness, only necessary parts shown here) */}
+      {showSettings && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in zoom-in duration-200">
+            <div className="bg-[#111116] w-full h-full md:max-w-xl md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800 p-6 md:p-8">
+               <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><Settings className="w-6 h-6 text-cyan-400"/> 系统设置与配置</h2>
+               <div className="flex-1 overflow-y-auto space-y-6">
+                  {/* AI 人设设置 */}
+                  <div className="bg-purple-900/20 p-4 rounded-xl border border-purple-500/30">
+                    <h3 className="text-purple-400 font-bold mb-3 flex items-center gap-2 text-sm"><Sparkles className="w-4 h-4"/> AI 导师人设定制</h3>
+                    <textarea 
+                      value={customPersona}
+                      onChange={(e) => saveAISettings(apiKey, apiBaseUrl, apiModel, selectedProvider, e.target.value)}
+                      placeholder={DEFAULT_PERSONA}
+                      className="w-full bg-black/50 border border-purple-500/30 rounded-lg p-3 text-white outline-none focus:border-purple-500 text-sm min-h-[80px] resize-none"
+                    />
+                  </div>
+
+                  {/* 每日目标时长设置 */}
+                  <div className="bg-emerald-900/20 p-4 rounded-xl border border-emerald-500/30">
+                     <div className="flex justify-between items-center mb-2">
+                       <h3 className="text-emerald-400 font-bold flex items-center gap-2 text-sm"><Clock className="w-4 h-4"/> 每日目标时长 (小时)</h3>
+                       {customTargetHours && <button onClick={() => saveTargetHours(null)} className="text-xs text-gray-400 underline hover:text-white transition">恢复默认</button>}
+                     </div>
+                     <input 
+                       type="range" 
+                       min="1" max="16" step="0.5"
+                       value={customTargetHours || stage.targetHours}
+                       onChange={(e) => saveTargetHours(parseFloat(e.target.value))}
+                       className="w-full accent-emerald-500 cursor-pointer h-2 bg-gray-700 rounded-lg appearance-none"
+                     />
+                     <div className="flex justify-between text-gray-500 text-xs mt-2 font-mono">
+                       <span>1h</span>
+                       <span className="text-emerald-400 font-bold">{customTargetHours || stage.targetHours}h</span>
+                       <span>16h</span>
+                     </div>
+                  </div>
+
+                  {/* AI 模型配置 */}
+                  <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+                    <h3 className="text-gray-400 font-bold mb-3 flex items-center gap-2 text-sm"><BrainCircuit className="w-4 h-4 text-cyan-500"/> AI 模型配置</h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="mb-2">
+                        <label className="text-gray-500 block mb-1">服务商</label>
+                        <div className="flex items-center bg-black/50 border border-gray-600 rounded-lg px-3 relative">
+                          <select value={selectedProvider} onChange={(e) => {
+                            const p = API_PROVIDERS.find(x => x.id === e.target.value);
+                            if (p) saveAISettings(apiKey, p.url, p.defaultModel, p.id, customPersona);
+                            else setSelectedProvider('custom');
+                          }} className="w-full bg-transparent py-3 text-white outline-none border-none appearance-none z-10 font-mono">
+                            {API_PROVIDERS.map(p => <option key={p.id} value={p.id} className="bg-gray-900">{p.name}</option>)}
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3" />
+                        </div>
+                      </div>
+                      <div className="mb-2">
+                        <label className="text-gray-500 block mb-1">API Key</label>
+                        <input type="password" placeholder="sk-..." value={apiKey} onChange={(e) => saveAISettings(e.target.value, apiBaseUrl, apiModel, selectedProvider, customPersona)} className="w-full bg-black/50 border border-gray-600 rounded-lg p-3 text-white outline-none focus:border-cyan-500 font-mono"/>
+                      </div>
+                      <div className="mb-2 relative">
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-gray-500">模型名称</label>
+                          <button onClick={fetchAvailableModels} disabled={isFetchingModels} className="text-[10px] bg-cyan-900/30 text-cyan-300 border border-cyan-800/50 px-2 py-1 rounded flex items-center gap-1 hover:bg-cyan-800/50 transition-colors">{isFetchingModels ? <RefreshCw className="w-3 h-3 animate-spin"/> : <List className="w-3 h-3"/>} 获取列表</button>
+                        </div>
+                        <div className="flex items-center bg-black/50 border border-gray-600 rounded-lg px-3 relative z-50">
+                          <Cpu className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+                          <input type="text" value={apiModel} onChange={(e) => { setApiModel(e.target.value); setIsModelListOpen(true); setModelSearch(e.target.value); }} onFocus={() => setIsModelListOpen(true)} className="w-full bg-transparent py-3 text-white outline-none font-mono" placeholder="输入或选择模型"/>
+                          <button onClick={() => setIsModelListOpen(!isModelListOpen)}><ChevronDown className="w-4 h-4 text-gray-500" /></button>
+                        </div>
+                        
+                        {/* Custom Dropdown for Models */}
+                        {isModelListOpen && availableModels.length > 0 && (
+                          <div className="absolute top-full left-0 w-full bg-[#1a1a20] border border-gray-700 rounded-b-lg shadow-xl max-h-40 overflow-y-auto z-[100] mt-1 font-mono">
+                            <div className="sticky top-0 bg-[#1a1a20] p-2 border-b border-gray-700 flex items-center gap-2">
+                              <Search className="w-3 h-3 text-gray-500" />
+                              <input type="text" value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} placeholder="搜索..." className="w-full bg-transparent text-white outline-none text-xs"/>
+                            </div>
+                            {availableModels.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase())).map(m => (
+                              <div key={m} onClick={() => { setApiModel(m); saveAISettings(apiKey, apiBaseUrl, m, selectedProvider, customPersona); setIsModelListOpen(false); }} className="px-3 py-2 hover:bg-cyan-900/30 cursor-pointer truncate text-gray-300 hover:text-cyan-400 transition-colors text-xs">{m}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 数据备份与恢复 */}
+                  <div className="bg-red-900/20 p-4 rounded-xl border border-red-700/30">
+                     <h3 className="text-red-400 font-bold mb-3 flex items-center gap-2 text-sm"><AlertTriangle className="w-4 h-4"/> 数据备份与恢复 (DATA BACKUP)</h3>
+                     <div className="flex gap-2">
+                       <button onClick={handleExportData} className="flex-1 bg-gray-800 hover:bg-gray-700 p-3 rounded-lg flex justify-center gap-2 transition-colors text-gray-400 hover:text-white text-sm"><Download className="w-4 h-4"/> 导出备份</button>
+                       <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-gray-800 hover:bg-gray-700 p-3 rounded-lg flex justify-center gap-2 transition-colors text-gray-400 hover:text-white text-sm"><Upload className="w-4 h-4"/> 导入覆盖</button>
+                       <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
+                     </div>
+                  </div>
+               </div>
+              
+              <div className="mt-4 pt-4 border-t border-gray-800">
+                 <button onClick={() => setShowSettings(false)} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors">关闭设置</button>
+              </div>
+            </div>
+          </div>
       )}
     </div>
   );
