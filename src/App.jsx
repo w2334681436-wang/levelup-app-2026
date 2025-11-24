@@ -8,7 +8,10 @@ import {
   Home,
   BarChart3,
   TrendingUp,
-  Edit
+  Edit,
+  Image,
+  Trash2,
+  Calendar
 } from 'lucide-react';
 
 // --- 1. 组件：自定义通知 (Toast) ---
@@ -106,18 +109,19 @@ const getStageInfo = () => {
 };
 
 const API_PROVIDERS = [
-  { id: 'siliconflow', name: '硅基流动 (SiliconFlow)', url: 'https://api.siliconflow.cn/v1', defaultModel: 'deepseek-ai/DeepSeek-R1' },
-  { id: 'deepseek', name: 'DeepSeek 官方', url: 'https://api.deepseek.com', defaultModel: 'deepseek-chat' },
-  { id: 'moonshot', name: '月之暗面 (Kimi)', url: 'https://api.moonshot.cn/v1', defaultModel: 'moonshot-v1-8k' },
-  { id: 'aliyun', name: '阿里云 (通义千问)', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen-turbo' },
-  { id: 'openai', name: 'OpenAI (需要梯子)', url: 'https://api.openai.com/v1', defaultModel: 'gpt-4o' },
-  { id: 'custom', name: '自定义 (Custom)', url: '', defaultModel: '' }
+  { id: 'siliconflow', name: '硅基流动 (SiliconFlow)', url: 'https://api.siliconflow.cn/v1', defaultModel: 'deepseek-ai/DeepSeek-R1', supportsVision: false },
+  { id: 'deepseek', name: 'DeepSeek 官方', url: 'https://api.deepseek.com', defaultModel: 'deepseek-chat', supportsVision: true },
+  { id: 'moonshot', name: '月之暗面 (Kimi)', url: 'https://api.moonshot.cn/v1', defaultModel: 'moonshot-v1-8k', supportsVision: false },
+  { id: 'aliyun', name: '阿里云 (通义千问)', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen-turbo', supportsVision: false },
+  { id: 'openai', name: 'OpenAI (需要梯子)', url: 'https://api.openai.com/v1', defaultModel: 'gpt-4o', supportsVision: true },
+  { id: 'doubao', name: '豆包 (字节跳动)', url: 'https://ark.cn-beijing.volces.com/api/v3', defaultModel: 'doubao-1-5-32k-pro', supportsVision: true },
+  { id: 'custom', name: '自定义 (Custom)', url: '', defaultModel: '', supportsVision: false }
 ];
 
 const COMMON_EMOJIS = ['👍', '🔥', '💪', '😭', '🙏', '🎉', '🤔', '💤', '📚', '☕️', '🤖', '👻'];
 
-// 默认人设
-const DEFAULT_PERSONA = "你是一位幽默、温暖的二次元风格考研导师。说话请尽量简短有趣，多用emoji，不要长篇大论。";
+// 默认人设 - 已移除二次元风格
+const DEFAULT_PERSONA = "你是一位专业、耐心的考研导师。请根据学生的学习数据和进度提供有针对性的建议和指导。";
 
 const SUBJECT_CONFIG = {
   english: { name: "英语", color: "text-red-400", keyword: ['英语', '单词', '长难句', '语法'] },
@@ -202,7 +206,138 @@ const LearningProgressPanel = ({ learningProgress, onProgressUpdate, isMobileVie
   );
 };
 
-// 移动端底部导航组件 (保持不变)
+// 历史记录查看组件
+const HistoryView = ({ history, isOpen, onClose }) => {
+  const [selectedDate, setSelectedDate] = useState(getTodayDateString());
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  if (!isOpen) return null;
+
+  const selectedDateData = history.find(d => d.date === selectedDate);
+  const availableDates = history.map(d => d.date).sort((a, b) => new Date(b) - new Date(a));
+  
+  const totalPages = Math.ceil(availableDates.length / itemsPerPage);
+  const paginatedDates = availableDates.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-[#111116] w-full h-full md:max-w-4xl md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800">
+        <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <Calendar className="w-6 h-6 text-cyan-400" />
+              历史学习记录
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">查看往日的学习成果和进度</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white p-2 rounded-full hover:bg-gray-800 transition">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex flex-1 overflow-hidden">
+          {/* 日期列表 */}
+          <div className="w-1/3 border-r border-gray-800 flex flex-col">
+            <div className="p-4 border-b border-gray-800">
+              <h3 className="font-bold text-gray-400 text-sm mb-2">选择日期</h3>
+              <div className="flex gap-2 mb-4">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 py-2 rounded text-sm"
+                >
+                  上一页
+                </button>
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 py-2 rounded text-sm"
+                >
+                  下一页
+                </button>
+              </div>
+              <div className="text-xs text-gray-500 text-center">
+                第 {currentPage} 页，共 {totalPages} 页
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              {paginatedDates.map(date => (
+                <button
+                  key={date}
+                  onClick={() => setSelectedDate(date)}
+                  className={`w-full text-left p-3 border-b border-gray-800 hover:bg-gray-800/50 transition ${
+                    selectedDate === date ? 'bg-cyan-900/30 border-cyan-500/50' : ''
+                  }`}
+                >
+                  <div className="font-medium text-white">{date}</div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {history.find(d => d.date === date)?.studyMinutes || 0} 分钟学习
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 详情面板 */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            {selectedDateData ? (
+              <div>
+                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                  {selectedDate}
+                  <span className="text-sm font-normal bg-emerald-900/30 text-emerald-400 px-2 py-1 rounded">
+                    {selectedDateData.studyMinutes} 分钟学习
+                  </span>
+                </h3>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-800">
+                    <div className="text-gray-400 text-sm">游戏券余额</div>
+                    <div className="text-purple-400 font-bold text-lg">{selectedDateData.gameBank}m</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-800">
+                    <div className="text-gray-400 text-sm">游戏时间使用</div>
+                    <div className="text-blue-400 font-bold text-lg">{selectedDateData.gameUsed}m</div>
+                  </div>
+                </div>
+
+                <h4 className="font-bold text-gray-400 mb-3">学习记录</h4>
+                <div className="space-y-3">
+                  {selectedDateData.logs && selectedDateData.logs.length > 0 ? (
+                    selectedDateData.logs.map((log, index) => (
+                      <div key={index} className="bg-[#1a1a20] p-4 rounded-lg border-l-2 border-emerald-500/50">
+                        <div className="flex justify-between text-gray-500 text-sm mb-2">
+                          <span className="font-mono text-emerald-600">{log.time}</span>
+                          <span className="text-emerald-500/80">+{log.duration}m</span>
+                        </div>
+                        <div className="text-gray-300">{log.content}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-gray-500 py-8">
+                      该日期没有学习记录
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 py-16">
+                <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <div>选择日期查看详细记录</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 移动端底部导航组件
 const MobileNav = ({ 
   mode, 
   switchMode, 
@@ -212,7 +347,10 @@ const MobileNav = ({
   todayStats, 
   activeView, 
   setActiveView,
-  openManualLog
+  openManualLog,
+  unreadAIMessages,
+  showHistory,
+  setShowHistory
 }) => {
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#111116] border-t border-gray-800 p-2 z-50">
@@ -234,6 +372,14 @@ const MobileNav = ({
         </button>
         
         <button 
+          onClick={() => setShowHistory(true)}
+          className="flex flex-col items-center p-2 rounded-lg text-gray-400 hover:text-blue-400"
+        >
+          <History className="w-5 h-5" />
+          <span className="text-xs mt-1">历史</span>
+        </button>
+        
+        <button 
           onClick={openManualLog}
           className="flex flex-col items-center p-2 rounded-lg text-gray-400 hover:text-emerald-400"
         >
@@ -247,6 +393,11 @@ const MobileNav = ({
         >
           <MessageCircle className="w-5 h-5" />
           <span className="text-xs mt-1">AI导师</span>
+          {unreadAIMessages > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
+              {unreadAIMessages}
+            </span>
+          )}
         </button>
         
         <button 
@@ -281,7 +432,7 @@ export default function LevelUpApp() {
   const [history, setHistory] = useState([]);
   const [learningProgress, setLearningProgress] = useState(initialProgress); // 新增学习进度状态
   
-  // AI 设置状态 (保持不变)
+  // AI 设置状态
   const [apiKey, setApiKey] = useState(''); 
   const [apiBaseUrl, setApiBaseUrl] = useState('https://api.siliconflow.cn/v1'); 
   const [apiModel, setApiModel] = useState('deepseek-ai/DeepSeek-R1');
@@ -293,34 +444,41 @@ export default function LevelUpApp() {
   const [isModelListOpen, setIsModelListOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   
-  // 聊天状态 (保持不变)
+  // 聊天状态
   const [chatMessages, setChatMessages] = useState([]); 
   const [chatInput, setChatInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [aiThinking, setAiThinking] = useState(false);
+  const [unreadAIMessages, setUnreadAIMessages] = useState(0);
   const chatEndRef = useRef(null);
 
-  // 界面模态框状态 (保持不变)
+  // 图像识别状态
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [imageDescriptions, setImageDescriptions] = useState({});
+
+  // 界面模态框状态
   const [showLogModal, setShowLogModal] = useState(false);
   const [isManualLog, setIsManualLog] = useState(false); 
   const [manualDuration, setManualDuration] = useState(45); 
   const [showStopModal, setShowStopModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false); 
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [logContent, setLogContent] = useState('');
   const [pendingStudyTime, setPendingStudyTime] = useState(0); 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // 通知与确认框状态 (保持不变)
+  // 通知与确认框状态
   const [notifications, setNotifications] = useState([]);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, isDangerous: false });
   const [pendingImportData, setPendingImportData] = useState(null);
 
   const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
   const timerRef = useRef(null);
   const appContainerRef = useRef(null);
 
-  // --- 通知系统逻辑 (保持不变) ---
+  // --- 通知系统逻辑 ---
   const addNotification = (message, type = 'info') => {
     const id = Date.now();
     setNotifications(prev => [...prev, { id, message, type }]);
@@ -391,6 +549,7 @@ export default function LevelUpApp() {
     localStorage.setItem('levelup_timer_state', JSON.stringify(state));
   };
 
+  // 扩展的数据加载函数
   const loadData = () => {
     try {
       const todayStr = getTodayDateString();
@@ -407,7 +566,7 @@ export default function LevelUpApp() {
         }
       }
       
-      // 加载 AI 和目标设置 (保持不变)
+      // 加载 AI 和目标设置
       const storedKey = localStorage.getItem('ai_api_key') || '';
       const storedBaseUrl = localStorage.getItem('ai_base_url') || 'https://api.siliconflow.cn/v1';
       const storedModel = localStorage.getItem('ai_model') || 'deepseek-ai/DeepSeek-R1';
@@ -417,6 +576,7 @@ export default function LevelUpApp() {
 
       const storedModelList = JSON.parse(localStorage.getItem('ai_model_list') || '[]');
       const storedChat = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
+      const storedUnread = parseInt(localStorage.getItem('ai_unread_messages') || '0');
 
       // 加载新的学习进度 
       const storedProgressText = localStorage.getItem('levelup_progress');
@@ -447,6 +607,7 @@ export default function LevelUpApp() {
       setCustomTargetHours(storedTargetHours);
       setAvailableModels(storedModelList);
       setChatMessages(storedChat);
+      setUnreadAIMessages(storedUnread);
 
       const todayData = storedHistory.find(d => d.date === todayStr);
       if (todayData) {
@@ -457,7 +618,7 @@ export default function LevelUpApp() {
         setTodayStats({ date: todayStr, studyMinutes: 0, gameBank: lastBank > 0 ? lastBank : 0, gameUsed: 0, logs: [] });
       }
 
-      // 检查并恢复计时器状态 (Bug 1 & 2)
+      // 检查并恢复计时器状态
       const storedTimerStateText = localStorage.getItem('levelup_timer_state');
       if (storedTimerStateText) {
         const storedTimerState = JSON.parse(storedTimerStateText);
@@ -548,6 +709,12 @@ export default function LevelUpApp() {
     }
   }
 
+  // 保存未读消息数
+  const saveUnreadMessages = (count) => {
+    setUnreadAIMessages(count);
+    localStorage.setItem('ai_unread_messages', count.toString());
+  };
+
   useEffect(() => {
     if (chatMessages.length > 0) {
       const recent = chatMessages.slice(-50);
@@ -557,7 +724,7 @@ export default function LevelUpApp() {
 
   useEffect(() => { loadData(); }, []);
 
-  // 计时器核心逻辑 (Bug 1 & 2 修复)
+  // 计时器核心逻辑
   useEffect(() => {
     const handleVisibilityChange = () => {
       const storedTimerStateText = localStorage.getItem('levelup_timer_state');
@@ -588,7 +755,7 @@ export default function LevelUpApp() {
       }
     };
     
-    // 添加事件监听器 (Bug 2 核心)
+    // 添加事件监听器
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Timer Interval logic
@@ -615,9 +782,45 @@ export default function LevelUpApp() {
       clearInterval(timerRef.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isActive, timeLeft, initialTime, mode]); // 依赖项更新
+  }, [isActive, timeLeft, initialTime, mode]);
 
-  // ... (其他 useEffects 保持不变) ...
+  // 自动复盘逻辑
+  useEffect(() => {
+    const checkDailyReview = () => {
+      const lastReviewDate = localStorage.getItem('last_ai_review_date');
+      const today = getTodayDateString();
+      
+      if (lastReviewDate !== today) {
+        const yesterday = getYesterdayDateString();
+        const yesterdayData = history.find(d => d.date === yesterday);
+        
+        if (yesterdayData && yesterdayData.studyMinutes > 0) {
+          // 自动发送复盘消息
+          const reviewMessage = {
+            role: 'assistant',
+            content: `📊 昨日学习复盘提醒\n\n昨天（${yesterday}）你学习了 ${(yesterdayData.studyMinutes/60).toFixed(1)} 小时，完成了 ${yesterdayData.logs.length} 个学习任务。需要我帮你分析一下学习效果和制定今日计划吗？`
+          };
+          
+          setChatMessages(prev => [...prev, reviewMessage]);
+          saveUnreadMessages(unreadAIMessages + 1);
+          localStorage.setItem('last_ai_review_date', today);
+        }
+      }
+    };
+
+    // 每天检查一次
+    const now = new Date();
+    const timeUntilNextCheck = (24 * 60 * 60 * 1000) - (now.getHours() * 60 * 60 * 1000 + now.getMinutes() * 60 * 1000 + now.getSeconds() * 1000);
+    
+    const timer = setTimeout(() => {
+      checkDailyReview();
+      // 之后每天检查一次
+      setInterval(checkDailyReview, 24 * 60 * 60 * 1000);
+    }, timeUntilNextCheck);
+
+    return () => clearTimeout(timer);
+  }, [history, unreadAIMessages]);
+
   useEffect(() => { 
     if (showChatModal) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -682,7 +885,7 @@ export default function LevelUpApp() {
     saveTimerState(false, timeLeft, initialTime, newMode);
   };
 
-  // 打开手动打卡 (保持不变)
+  // 打开手动打卡
   const openManualLog = () => {
     setIsManualLog(true);
     setManualDuration(45); 
@@ -795,21 +998,31 @@ export default function LevelUpApp() {
   
   const cancelStopTimer = () => setShowStopModal(false);
 
-  // ... (导入导出函数) ...
+  // 扩展的导入导出函数
   const handleExportData = () => {
     try {
       const exportData = {
+        version: '2.0',
+        exportDate: new Date().toISOString(),
         history: history,
-        progress: learningProgress
+        progress: learningProgress,
+        settings: {
+          customTargetHours: customTargetHours,
+          customPersona: customPersona,
+          selectedProvider: selectedProvider,
+          apiBaseUrl: apiBaseUrl,
+          apiModel: apiModel
+          // 注意：不导出 API Key 出于安全考虑
+        }
       };
-      const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
+      const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
       const a = document.createElement('a'); 
       a.href = str; 
       a.download = `LevelUp_Backup_${getTodayDateString()}.json`; 
       document.body.appendChild(a); 
       a.click(); 
       document.body.removeChild(a);
-      addNotification("数据导出成功！", "success");
+      addNotification("完整数据导出成功！", "success");
     } catch(err) {
       addNotification("导出失败，请重试。", "error");
     }
@@ -823,22 +1036,38 @@ export default function LevelUpApp() {
     r.onload = (ev) => { 
       try { 
         const d = JSON.parse(ev.target.result); 
-        // 导入时兼容旧格式（数组）和新格式（对象）
-        const dataToImport = Array.isArray(d) ? d : d.history;
-        let progressToImport = d.progress || initialProgress;
-
-         // 兼容导入旧的进度条格式，如果发现是数字，则使用 initialProgress 默认内容
-         if (progressToImport.english && typeof progressToImport.english.progress === 'number') {
-             progressToImport = initialProgress;
-         }
         
-        if (Array.isArray(dataToImport)) {
-          setPendingImportData({ history: dataToImport, progress: progressToImport });
+        // 版本兼容性处理
+        if (d.version === '2.0') {
+          // 新版本格式
+          setPendingImportData(d);
+          setConfirmState({
+            isOpen: true,
+            title: "导入完整备份",
+            message: `检测到完整备份文件（版本 ${d.version}）。导入将覆盖当前的所有学习数据、进度和设置（除API Key外）。确定继续吗？`,
+            onConfirm: () => confirmImportData(d),
+            isDangerous: true,
+            confirmText: "覆盖并导入"
+          });
+        } else if (Array.isArray(d)) {
+          // 旧版本格式（只有历史记录）
+          setPendingImportData({ history: d, progress: initialProgress });
+          setConfirmState({
+            isOpen: true,
+            title: "导入旧版备份",
+            message: `检测到旧版备份文件（${d.length} 条历史记录）。导入将覆盖当前的历史记录。确定继续吗？`,
+            onConfirm: () => confirmImportData({ history: d, progress: initialProgress }),
+            isDangerous: true,
+            confirmText: "覆盖并导入"
+          });
+        } else if (d.history) {
+          // 兼容旧版对象格式
+          setPendingImportData(d);
           setConfirmState({
             isOpen: true,
             title: "导入备份",
-            message: `解析到 ${dataToImport.length} 条历史记录。导入将覆盖当前的历史记录和学习进度，确定继续吗？`,
-            onConfirm: () => confirmImportData({ history: dataToImport, progress: progressToImport }),
+            message: `解析到 ${d.history.length} 条历史记录。导入将覆盖当前的历史记录和学习进度，确定继续吗？`,
+            onConfirm: () => confirmImportData(d),
             isDangerous: true,
             confirmText: "覆盖并导入"
           });
@@ -854,15 +1083,41 @@ export default function LevelUpApp() {
   };
 
   const confirmImportData = (data) => {
-    localStorage.setItem('levelup_history', JSON.stringify(data.history));
-    localStorage.setItem('levelup_progress', JSON.stringify(data.progress));
-    loadData();
-    closeConfirm();
-    addNotification("数据导入成功！", "success");
-    setPendingImportData(null);
+    try {
+      // 导入历史记录和学习进度
+      localStorage.setItem('levelup_history', JSON.stringify(data.history));
+      localStorage.setItem('levelup_progress', JSON.stringify(data.progress || initialProgress));
+      
+      // 如果是新版本格式，导入设置
+      if (data.version === '2.0' && data.settings) {
+        const settings = data.settings;
+        if (settings.customTargetHours !== undefined) {
+          localStorage.setItem('target_hours', settings.customTargetHours);
+        }
+        if (settings.customPersona) {
+          localStorage.setItem('ai_persona', settings.customPersona);
+        }
+        if (settings.selectedProvider) {
+          localStorage.setItem('ai_provider', settings.selectedProvider);
+        }
+        if (settings.apiBaseUrl) {
+          localStorage.setItem('ai_base_url', settings.apiBaseUrl);
+        }
+        if (settings.apiModel) {
+          localStorage.setItem('ai_model', settings.apiModel);
+        }
+      }
+      
+      loadData();
+      closeConfirm();
+      addNotification("数据导入成功！", "success");
+      setPendingImportData(null);
+    } catch (error) {
+      addNotification("导入过程中出现错误: " + error.message, "error");
+    }
   };
-  // ... (AI 模型获取函数) ...
 
+  // AI 相关函数
   const fetchAvailableModels = async () => {
     if (!apiKey) return addNotification("请先输入 API Key！", "error");
     setIsFetchingModels(true);
@@ -890,12 +1145,129 @@ export default function LevelUpApp() {
     }
   };
 
+  // 图像处理函数
+  const handleImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length + selectedImages.length > 5) {
+      addNotification("最多只能上传5张图片", "error");
+      return;
+    }
 
-  const sendToAI = async (newMessages) => {
+    const newImages = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      id: Date.now() + Math.random()
+    }));
+
+    setSelectedImages(prev => [...prev, ...newImages]);
+    e.target.value = '';
+  };
+
+  const removeImage = (id) => {
+    setSelectedImages(prev => {
+      const imageToRemove = prev.find(img => img.id === id);
+      if (imageToRemove) {
+        URL.revokeObjectURL(imageToRemove.preview);
+      }
+      return prev.filter(img => img.id !== id);
+    });
+  };
+
+  // 图像识别函数
+  const analyzeImage = async (imageFile, provider) => {
+    if (provider === 'deepseek') {
+      // DeepSeek 多模态API
+      const formData = new FormData();
+      formData.append('model', 'deepseek-chat');
+      formData.append('messages', JSON.stringify([{
+        role: 'user',
+        content: [
+          { type: 'text', text: '请分析这张图片中的内容，特别是如果包含题目，请详细解答。' },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${await fileToBase64(imageFile)}` } }
+        ]
+      }]));
+      
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: '请分析这张图片中的内容，特别是如果包含题目，请详细解答。' },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${await fileToBase64(imageFile)}` } }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) throw new Error('DeepSeek API 调用失败');
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } else if (provider === 'doubao') {
+      // 豆包多模态API
+      const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'doubao-1-5-32k-pro-vision',
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: '请分析这张图片中的内容' },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${await fileToBase64(imageFile)}` } }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) throw new Error('豆包 API 调用失败');
+      const data = await response.json();
+      return data.choices[0].message.content;
+    }
+  };
+
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const sendToAI = async (newMessages, images = []) => {
     setAiThinking(true);
     try {
       const cleanBaseUrl = apiBaseUrl.replace(/\/$/, '');
       const endpoint = `${cleanBaseUrl}/chat/completions`;
+      
+      // 构建消息内容
+      let messages = [...newMessages];
+      
+      // 如果有图片，添加到最后一条用户消息
+      if (images.length > 0 && selectedProvider === 'deepseek') {
+        const lastUserMessage = messages[messages.length - 1];
+        if (lastUserMessage.role === 'user') {
+          lastUserMessage.content = [
+            { type: 'text', text: lastUserMessage.content },
+            ...images.map(img => ({
+              type: 'image_url',
+              image_url: { url: img.preview }
+            }))
+          ];
+        }
+      }
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -905,7 +1277,7 @@ export default function LevelUpApp() {
         },
         body: JSON.stringify({
           model: apiModel,
-          messages: newMessages,
+          messages: messages,
           temperature: 0.7,
           stream: false
         })
@@ -926,7 +1298,7 @@ export default function LevelUpApp() {
     }
   };
 
-  // AI 导师启动逻辑 (修改上下文以反映新的进度内容)
+  // AI 导师启动逻辑 (修复人设bug)
   const startAICoach = () => {
     if (!apiKey) {
       addNotification("请先在设置中输入 API Key！", "error");
@@ -934,16 +1306,19 @@ export default function LevelUpApp() {
       return;
     }
     setShowChatModal(true);
+    saveUnreadMessages(0); // 清除未读消息
+    
+    // 使用最新的人设设置
+    const currentPersona = customPersona.trim() || DEFAULT_PERSONA;
     
     // 如果是新对话，生成系统上下文
     if (chatMessages.length === 0 || chatMessages.length === 1 && chatMessages[0].role === 'system') {
       const yesterdayStr = getYesterdayDateString();
       const yesterdayData = history.find(d => d.date === yesterdayStr);
       
-      const persona = customPersona.trim() || DEFAULT_PERSONA;
       const target = customTargetHours || stage.targetHours;
 
-      // 组装实时数据上下文 (Feature 3)
+      // 组装实时数据上下文
       let dataContext = `
         --- 实时学习数据 ---
         1. 考研目标: 上海交大/中科大AI硕士(2026)。
@@ -964,7 +1339,7 @@ export default function LevelUpApp() {
       }
 
       // 提示 AI 导师根据学习内容评估进度
-      const systemContext = `${persona}\n\n${dataContext}\n\n根据以上学习内容和你的专业知识，评估用户当前学习阶段（${stage.name}）的进度是落后、正常还是超前，并用你的人设给出简洁的分析、建议或鼓励。`;
+      const systemContext = `${currentPersona}\n\n${dataContext}\n\n根据以上学习内容和你的专业知识，评估用户当前学习阶段（${stage.name}）的进度是落后、正常还是超前，并用你的人设给出简洁的分析、建议或鼓励。`;
 
       const initialMsg = { role: 'system', content: systemContext };
       const triggerMsg = { role: 'user', content: "导师，请评估我当前的整体学习情况和进度。" };
@@ -975,12 +1350,37 @@ export default function LevelUpApp() {
     }
   };
 
-  // 修改 handleUserSend 中的上下文快照
+  // 新对话功能
+  const startNewChat = () => {
+    setChatMessages([]);
+    addNotification("已开始新的对话", "info");
+  };
+
+  // 清除聊天记录
+  const clearChatHistory = () => {
+    setConfirmState({
+      isOpen: true,
+      title: "清除聊天记录",
+      message: "确定要清除所有聊天记录吗？此操作不可撤销。",
+      onConfirm: () => {
+        setChatMessages([]);
+        localStorage.removeItem('ai_chat_history');
+        closeConfirm();
+        addNotification("聊天记录已清除", "success");
+      },
+      isDangerous: true,
+      confirmText: "确定清除"
+    });
+  };
+
+  // 修改 handleUserSend 中的上下文快照 (修复人设bug)
   const handleUserSend = () => {
-    if (!chatInput.trim()) return;
-    const newMsg = { role: 'user', content: chatInput };
+    if (!chatInput.trim() && selectedImages.length === 0) return;
     
-    const persona = customPersona.trim() || DEFAULT_PERSONA;
+    // 使用最新的人设设置
+    const currentPersona = customPersona.trim() || DEFAULT_PERSONA;
+    
+    const newMsg = { role: 'user', content: chatInput };
     
     // 每次发送用户消息时，携带最新的进度板快照（摘要形式）
     // 截取前50个字符作为摘要，以减少 token 消耗
@@ -993,13 +1393,17 @@ export default function LevelUpApp() {
       408: ${getSummary(learningProgress.cs.content)}
     `;
     
-    const currentContext = { role: 'system', content: `${persona}\n\n[实时数据快照 - 关键进度摘要: ${progressSummary.trim().replace(/\s+/g, ' ')}。今日已学: ${(todayStats.studyMinutes / 60).toFixed(1)}h。]`};
+    const currentContext = { 
+      role: 'system', 
+      content: `${currentPersona}\n\n[实时数据快照 - 关键进度摘要: ${progressSummary.trim().replace(/\s+/g, ' ')}。今日已学: ${(todayStats.studyMinutes / 60).toFixed(1)}h。]`
+    };
 
     const updatedHistory = [...chatMessages, currentContext, newMsg];
     setChatMessages(prev => [...prev, newMsg]);
     setChatInput('');
     setShowEmojiPicker(false);
-    sendToAI(updatedHistory);
+    sendToAI(updatedHistory, selectedImages);
+    setSelectedImages([]); // 发送后清空图片
   };
 
   const handleEmojiClick = (emoji) => {
@@ -1041,6 +1445,13 @@ export default function LevelUpApp() {
         confirmText={confirmState.confirmText}
       />
 
+      {/* 历史记录查看模态框 */}
+      <HistoryView 
+        history={history}
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+      />
+
       {/* 背景纹理 */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(20,20,40,0.4),transparent_70%)] pointer-events-none"></div>
       <div className="absolute inset-0 opacity-5 pointer-events-none mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
@@ -1058,7 +1469,21 @@ export default function LevelUpApp() {
 
         <button onClick={startAICoach} className="w-full relative overflow-hidden group bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/30 hover:border-purple-400 text-white font-bold py-3 rounded-xl shadow-[0_0_20px_rgba(139,92,246,0.2)] flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] flex-shrink-0">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-400/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-          <MessageCircle className="w-5 h-5 text-purple-400 group-hover:text-white transition-colors" /> <span className="relative z-10">进入 AI 导师通信终端</span>
+          <MessageCircle className="w-5 h-5 text-purple-400 group-hover:text-white transition-colors" /> 
+          <span className="relative z-10">进入 AI 导师通信终端</span>
+          {unreadAIMessages > 0 && (
+            <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
+              {unreadAIMessages}
+            </span>
+          )}
+        </button>
+
+        <button 
+          onClick={() => setShowHistory(true)}
+          className="w-full bg-blue-900/30 border border-blue-500/30 hover:border-blue-400 text-blue-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all"
+        >
+          <History className="w-5 h-5" />
+          查看历史记录
         </button>
 
         {showSettings && (
@@ -1112,7 +1537,7 @@ export default function LevelUpApp() {
         </div>
       </div>
 
-      {/* 移动端底部导航 (保持不变) */}
+      {/* 移动端底部导航 */}
       <MobileNav 
         mode={mode}
         switchMode={switchMode}
@@ -1123,9 +1548,12 @@ export default function LevelUpApp() {
         activeView={activeView}
         setActiveView={setActiveView}
         openManualLog={openManualLog}
+        unreadAIMessages={unreadAIMessages}
+        showHistory={showHistory}
+        setShowHistory={setShowHistory}
       />
 
-      {/* Main Timer Area (保持不变) */}
+      {/* Main Timer Area */}
       <div className={`flex-1 flex flex-col items-center justify-center p-4 relative bg-gradient-to-br ${getBgColor()} transition-colors duration-1000 overflow-hidden pb-20 md:pb-4`}>
         
         {/* 移动端视图切换 (主页) */}
@@ -1212,7 +1640,7 @@ export default function LevelUpApp() {
           </div>
         </div>
 
-        {/* 计时器视图 (保持不变) */}
+        {/* 计时器视图 */}
         <div className={`${activeView === 'timer' ? 'flex' : 'hidden md:flex'} flex-col items-center w-full`}>
           <div className={`absolute top-4 right-4 z-30 transition-opacity duration-300 flex items-center gap-4 ${isZen && isActive ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}>
             {isZen && <button onClick={() => setIsZen(false)} className="bg-gray-800/50 hover:bg-gray-700 text-gray-400 hover:text-white px-3 py-2 rounded text-xs transition">
@@ -1228,7 +1656,7 @@ export default function LevelUpApp() {
             </button>
           </div>
 
-          {/* 桌面端模式切换 (保持不变) */}
+          {/* 桌面端模式切换 */}
           <div className={`hidden md:flex gap-4 mb-8 md:mb-12 bg-gray-900/80 backdrop-blur-md p-2 rounded-2xl border border-gray-700/50 shadow-2xl z-10 transition-all duration-500 ${isZen ? '-translate-y-40 opacity-0 scale-75 absolute pointer-events-none' : 'translate-y-0 opacity-100 scale-100 pointer-events-auto'}`}>
             <button 
               onClick={() => switchMode('focus')}
@@ -1251,7 +1679,7 @@ export default function LevelUpApp() {
           </div>
 
           <div className={`relative mb-8 md:mb-12 group transition-all duration-700 ease-in-out ${isZen ? 'scale-125 md:scale-[2.5]' : 'scale-90 md:scale-100'}`}>
-            {/* Zen Mode Decorative Elements (保持不变) */}
+            {/* Zen Mode Decorative Elements */}
             {!isZen && (
               <>
                 <div className={`absolute inset-0 rounded-full border-4 border-gray-800/50 scale-110`}></div>
@@ -1264,7 +1692,7 @@ export default function LevelUpApp() {
                ${isZen ? 'w-56 h-56 border-0' : `w-64 h-64 md:w-80 md:h-80 border-8 bg-gray-900 shadow-[0_0_60px_-15px_rgba(0,0,0,0.6)] ${getThemeColor()}`}
             `}>
                
-               {/* Progress Circle (保持不变) */}
+               {/* Progress Circle */}
                <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
                  {!isZen && <circle cx="50" cy="50" r="44" fill="none" stroke="#1f2937" strokeWidth="4" />}
                  <circle 
@@ -1296,7 +1724,7 @@ export default function LevelUpApp() {
             </div>
           </div>
 
-          {/* Controls (保持不变) */}
+          {/* Controls */}
           <div className={`flex gap-4 md:gap-6 z-10 transition-all duration-300 ${isZen && isActive ? 'opacity-30 hover:opacity-100' : 'opacity-100'}`}>
             {!isActive ? (
               <button 
@@ -1340,7 +1768,7 @@ export default function LevelUpApp() {
         </div>
       </div>
 
-      {/* Stop Confirmation Modal (保持不变) */}
+      {/* Stop Confirmation Modal */}
       {showStopModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-gray-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-[0_0_50px_rgba(239,68,68,0.2)]">
@@ -1371,20 +1799,36 @@ export default function LevelUpApp() {
         </div>
       )}
 
-      {/* AI Chat Modal (保持不变) */}
+      {/* AI Chat Modal (增强版) */}
       {showChatModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-[#111116] w-full h-full md:max-w-md md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800">
-            {/* Chat Header (保持不变) */}
+            {/* Chat Header (增强版) */}
             <div className="p-4 bg-[#16161c] border-b border-gray-800 flex justify-between items-center z-10 shadow-lg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg"><Sparkles className="w-5 h-5 text-white" /></div>
                 <div><h3 className="font-bold text-white text-sm">AI 导师</h3><p className="text-[10px] text-gray-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Online</p></div>
               </div>
-              <button onClick={() => setShowChatModal(false)} className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition"><X className="w-4 h-4"/></button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={startNewChat}
+                  className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-blue-400 hover:bg-gray-700 transition"
+                  title="新对话"
+                >
+                  <RefreshCw className="w-4 h-4"/>
+                </button>
+                <button 
+                  onClick={clearChatHistory}
+                  className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-gray-700 transition"
+                  title="清除记录"
+                >
+                  <Trash2 className="w-4 h-4"/>
+                </button>
+                <button onClick={() => setShowChatModal(false)} className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition"><X className="w-4 h-4"/></button>
+              </div>
             </div>
 
-            {/* Messages Area (保持不变) */}
+            {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0a0a0a]">
               {chatMessages.filter(m => m.role !== 'system').map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
@@ -1410,7 +1854,29 @@ export default function LevelUpApp() {
                 </div>
               ))}
               
-              {/* Typing Indicator (保持不变) */}
+              {/* 图片预览区域 */}
+              {selectedImages.length > 0 && (
+                <div className="flex justify-end">
+                  <div className="max-w-[75%] bg-emerald-600 p-3 rounded-2xl rounded-tr-none">
+                    <div className="text-white text-xs mb-2">上传的图片:</div>
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedImages.map(img => (
+                        <div key={img.id} className="relative">
+                          <img src={img.preview} alt="预览" className="w-16 h-16 object-cover rounded border border-white/20" />
+                          <button 
+                            onClick={() => removeImage(img.id)}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Typing Indicator */}
               {aiThinking && (
                 <div className="flex justify-start animate-pulse">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex-shrink-0 flex items-center justify-center mr-2">
@@ -1426,24 +1892,78 @@ export default function LevelUpApp() {
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input Area (保持不变) */}
+            {/* Input Area (增强版) */}
             <div className="p-3 bg-[#16161c] border-t border-gray-800 flex flex-col gap-2">
               {showEmojiPicker && (
                 <div className="bg-[#1f1f27] p-3 rounded-xl grid grid-cols-6 gap-2 mb-2 absolute bottom-20 left-4 shadow-xl border border-gray-700 z-50 animate-in zoom-in duration-200 origin-bottom-left">
                   {COMMON_EMOJIS.map(e => <button key={e} onClick={() => handleEmojiClick(e)} className="text-2xl hover:bg-white/10 p-2 rounded transition">{e}</button>)}
                 </div>
               )}
+              
+              {/* 图片上传区域 */}
+              {selectedImages.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {selectedImages.map(img => (
+                    <div key={img.id} className="relative flex-shrink-0">
+                      <img src={img.preview} alt="预览" className="w-12 h-12 object-cover rounded border border-gray-600" />
+                      <button 
+                        onClick={() => removeImage(img.id)}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
               <div className="flex items-center gap-2 bg-[#0a0a0a] p-1.5 rounded-full border border-gray-800 focus-within:border-purple-500/50 transition-colors">
+                <button 
+                  onClick={() => imageInputRef.current?.click()} 
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-blue-400 hover:bg-white/5 transition"
+                  title="上传图片"
+                >
+                  <Image className="w-5 h-5"/>
+                </button>
+                <input 
+                  type="file" 
+                  ref={imageInputRef}
+                  onChange={handleImageSelect}
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                />
+                
                 <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-yellow-400 hover:bg-white/5 transition"><Smile className="w-5 h-5"/></button>
-                <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleUserSend()} placeholder="输入消息..." className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-gray-600"/>
-                <button onClick={handleUserSend} disabled={!chatInput.trim() || aiThinking} className="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg"><Send className="w-4 h-4 ml-0.5" /></button>
+                <input 
+                  type="text" 
+                  value={chatInput} 
+                  onChange={(e) => setChatInput(e.target.value)} 
+                  onKeyDown={(e) => e.key === 'Enter' && handleUserSend()} 
+                  placeholder={selectedProvider === 'deepseek' || selectedProvider === 'doubao' ? "输入消息或上传图片..." : "输入消息..."}
+                  className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-gray-600"
+                />
+                <button 
+                  onClick={handleUserSend} 
+                  disabled={(!chatInput.trim() && selectedImages.length === 0) || aiThinking} 
+                  className="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg"
+                >
+                  <Send className="w-4 h-4 ml-0.5" />
+                </button>
               </div>
+              
+              {/* 多模态支持提示 */}
+              {(selectedProvider === 'deepseek' || selectedProvider === 'doubao') && (
+                <div className="text-[10px] text-gray-500 text-center">
+                  支持图片识别分析 {selectedProvider === 'deepseek' ? '(DeepSeek-Vision)' : '(豆包多模态)'}
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Log Modal (Supports Both Timer Finish and Manual Entry) (保持不变) */}
+      {/* Log Modal (Supports Both Timer Finish and Manual Entry) */}
       {showLogModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-gray-900 border border-emerald-500/30 rounded-2xl p-6 max-w-md w-full shadow-[0_0_50px_rgba(16,185,129,0.15)] relative overflow-hidden">
@@ -1481,7 +2001,7 @@ export default function LevelUpApp() {
         </div>
       )}
 
-      {/* Settings Modal (保持不变) */}
+      {/* Settings Modal (增强版) */}
       {showSettings && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in zoom-in duration-200">
             <div className="bg-[#111116] w-full h-full md:max-w-xl md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800 p-6 md:p-8">
@@ -1530,10 +2050,19 @@ export default function LevelUpApp() {
                             if (p) saveAISettings(apiKey, p.url, p.defaultModel, p.id, customPersona);
                             else setSelectedProvider('custom');
                           }} className="w-full bg-transparent py-3 text-white outline-none border-none appearance-none z-10 font-mono">
-                            {API_PROVIDERS.map(p => <option key={p.id} value={p.id} className="bg-gray-900">{p.name}</option>)}
+                            {API_PROVIDERS.map(p => (
+                              <option key={p.id} value={p.id} className="bg-gray-900">
+                                {p.name} {p.supportsVision ? '📷' : ''}
+                              </option>
+                            ))}
                           </select>
                           <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3" />
                         </div>
+                        {API_PROVIDERS.find(p => p.id === selectedProvider)?.supportsVision && (
+                          <div className="text-[10px] text-green-400 mt-1 flex items-center gap-1">
+                            <Image className="w-3 h-3" /> 支持图片识别功能
+                          </div>
+                        )}
                       </div>
                       <div className="mb-2">
                         <label className="text-gray-500 block mb-1">API Key</label>
@@ -1574,6 +2103,7 @@ export default function LevelUpApp() {
                        <button onClick={() => fileInputRef.current?.click()} className="flex-1 bg-gray-800 hover:bg-gray-700 p-3 rounded-lg flex justify-center gap-2 transition-colors text-gray-400 hover:text-white text-sm"><Upload className="w-4 h-4"/> 导入覆盖</button>
                        <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
                      </div>
+                     <p className="text-[10px] text-gray-500 mt-2">导出包含：历史记录、学习进度、个性化设置（不含API Key）</p>
                   </div>
                </div>
               
