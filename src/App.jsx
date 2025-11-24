@@ -87,6 +87,36 @@ const cleanAIResponse = (text) => {
   return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 };
 
+// Markdown 渲染组件
+const MarkdownMessage = ({ content }) => {
+  if (!content) return null;
+  
+  // 简单的 markdown 解析
+  const parseMarkdown = (text) => {
+    // 处理粗体 **text**
+    let parsed = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // 处理标题 ### 标题
+    parsed = parsed.replace(/### (.*?)(?=\n|$)/g, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>');
+    // 处理 ## 标题
+    parsed = parsed.replace(/## (.*?)(?=\n|$)/g, '<h2 class="text-xl font-bold mt-4 mb-2">$1</h2>');
+    // 处理列表项 - 或 *
+    parsed = parsed.replace(/^[-*] (.*?)(?=\n|$)/gm, '<li class="ml-4">$1</li>');
+    // 将连续的列表项包装在 ul 中
+    parsed = parsed.replace(/(<li class="ml-4">.*?<\/li>)+/g, '<ul class="list-disc ml-4 my-2">$&</ul>');
+    // 处理换行
+    parsed = parsed.replace(/\n/g, '<br />');
+    
+    return parsed;
+  };
+
+  return (
+    <div 
+      className="markdown-content"
+      dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }}
+    />
+  );
+};
+
 const getStageInfo = () => {
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -121,7 +151,7 @@ const API_PROVIDERS = [
 const COMMON_EMOJIS = ['👍', '🔥', '💪', '😭', '🙏', '🎉', '🤔', '💤', '📚', '☕️', '🤖', '👻'];
 
 // 默认人设 - 已移除二次元风格
-const DEFAULT_PERSONA = "你是一位专业、耐心的考研导师。请根据学生的学习数据和进度提供有针对性的建议和指导。";
+const DEFAULT_PERSONA = "你是一位专业、耐心的考研导师。请根据学生的学习数据和进度提供有针对性的建议和指导。请使用markdown格式回复，用**粗体**强调重点，用###表示小标题，用-表示列表项。";
 
 const SUBJECT_CONFIG = {
   english: { name: "英语", color: "text-red-400", keyword: ['英语', '单词', '长难句', '语法'] },
@@ -438,6 +468,7 @@ export default function LevelUpApp() {
   const [apiModel, setApiModel] = useState('deepseek-ai/DeepSeek-R1');
   const [selectedProvider, setSelectedProvider] = useState('siliconflow');
   const [customPersona, setCustomPersona] = useState(''); 
+  const [deepThinkingMode, setDeepThinkingMode] = useState(false); // 新增：深度思考模式
   
   const [availableModels, setAvailableModels] = useState([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
@@ -573,6 +604,7 @@ export default function LevelUpApp() {
       const storedProvider = localStorage.getItem('ai_provider') || 'siliconflow';
       const storedPersona = localStorage.getItem('ai_persona') || '';
       const storedTargetHours = localStorage.getItem('target_hours') ? parseFloat(localStorage.getItem('target_hours')) : null;
+      const storedDeepThinking = localStorage.getItem('deep_thinking_mode') === 'true';
 
       const storedModelList = JSON.parse(localStorage.getItem('ai_model_list') || '[]');
       const storedChat = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
@@ -605,6 +637,7 @@ export default function LevelUpApp() {
       setSelectedProvider(storedProvider);
       setCustomPersona(storedPersona);
       setCustomTargetHours(storedTargetHours);
+      setDeepThinkingMode(storedDeepThinking);
       setAvailableModels(storedModelList);
       setChatMessages(storedChat);
       setUnreadAIMessages(storedUnread);
@@ -709,6 +742,12 @@ export default function LevelUpApp() {
     }
   }
 
+  // 保存深度思考模式设置
+  const saveDeepThinkingMode = (enabled) => {
+    setDeepThinkingMode(enabled);
+    localStorage.setItem('deep_thinking_mode', enabled.toString());
+  };
+
   // 保存未读消息数
   const saveUnreadMessages = (count) => {
     setUnreadAIMessages(count);
@@ -724,7 +763,7 @@ export default function LevelUpApp() {
 
   useEffect(() => { loadData(); }, []);
 
-  // 计时器核心逻辑
+  // 计时器核心逻辑 - 修复游戏模式防刷时长
   useEffect(() => {
     const handleVisibilityChange = () => {
       const storedTimerStateText = localStorage.getItem('levelup_timer_state');
@@ -1246,6 +1285,7 @@ export default function LevelUpApp() {
     });
   };
 
+  // 修改后的 AI 发送函数，支持深度思考模式
   const sendToAI = async (newMessages, images = []) => {
     setAiThinking(true);
     try {
@@ -1256,9 +1296,10 @@ export default function LevelUpApp() {
       let messages = [...newMessages];
       
       // 如果有图片，添加到最后一条用户消息
-      if (images.length > 0 && selectedProvider === 'deepseek') {
+      if (images.length > 0 && (selectedProvider === 'deepseek' || selectedProvider === 'doubao')) {
         const lastUserMessage = messages[messages.length - 1];
         if (lastUserMessage.role === 'user') {
+          // 对于支持多模态的API，构建包含图片的消息
           lastUserMessage.content = [
             { type: 'text', text: lastUserMessage.content },
             ...images.map(img => ({
@@ -1269,18 +1310,22 @@ export default function LevelUpApp() {
         }
       }
       
+      // 根据深度思考模式调整参数
+      const requestBody = {
+        model: apiModel,
+        messages: messages,
+        temperature: deepThinkingMode ? 0.3 : 0.7, // 深度思考模式温度更低，更确定
+        max_tokens: deepThinkingMode ? 4000 : 2000, // 深度思考模式允许更多token
+        stream: false
+      };
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model: apiModel,
-          messages: messages,
-          temperature: 0.7,
-          stream: false
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const data = await response.json();
@@ -1290,9 +1335,19 @@ export default function LevelUpApp() {
         const rawReply = data.choices[0].message.content;
         const cleanReply = cleanAIResponse(rawReply);
         setChatMessages(prev => [...prev, { role: 'assistant', content: cleanReply }]);
+        
+        // 如果不是在聊天窗口中，增加未读消息计数
+        if (!showChatModal) {
+          saveUnreadMessages(unreadAIMessages + 1);
+        }
       }
     } catch (error) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ 连接失败: ${error.message}` }]);
+      const errorMessage = `⚠️ 连接失败: ${error.message}`;
+      setChatMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);
+      
+      if (!showChatModal) {
+        saveUnreadMessages(unreadAIMessages + 1);
+      }
     } finally {
       setAiThinking(false);
     }
@@ -1339,7 +1394,7 @@ export default function LevelUpApp() {
       }
 
       // 提示 AI 导师根据学习内容评估进度
-      const systemContext = `${currentPersona}\n\n${dataContext}\n\n根据以上学习内容和你的专业知识，评估用户当前学习阶段（${stage.name}）的进度是落后、正常还是超前，并用你的人设给出简洁的分析、建议或鼓励。`;
+      const systemContext = `${currentPersona}\n\n${dataContext}\n\n根据以上学习内容和你的专业知识，评估用户当前学习阶段（${stage.name}）的进度是落后、正常还是超前，并用你的人设给出简洁的分析、建议或鼓励。请使用markdown格式回复，用**粗体**强调重点，用###表示小标题，用-表示列表项。`;
 
       const initialMsg = { role: 'system', content: systemContext };
       const triggerMsg = { role: 'user', content: "导师，请评估我当前的整体学习情况和进度。" };
@@ -1380,7 +1435,12 @@ export default function LevelUpApp() {
     // 使用最新的人设设置
     const currentPersona = customPersona.trim() || DEFAULT_PERSONA;
     
-    const newMsg = { role: 'user', content: chatInput };
+    // 创建用户消息，包含图片信息
+    const userMessage = { 
+      role: 'user', 
+      content: chatInput,
+      images: selectedImages.length > 0 ? [...selectedImages] : undefined
+    };
     
     // 每次发送用户消息时，携带最新的进度板快照（摘要形式）
     // 截取前50个字符作为摘要，以减少 token 消耗
@@ -1398,8 +1458,8 @@ export default function LevelUpApp() {
       content: `${currentPersona}\n\n[实时数据快照 - 关键进度摘要: ${progressSummary.trim().replace(/\s+/g, ' ')}。今日已学: ${(todayStats.studyMinutes / 60).toFixed(1)}h。]`
     };
 
-    const updatedHistory = [...chatMessages, currentContext, newMsg];
-    setChatMessages(prev => [...prev, newMsg]);
+    const updatedHistory = [...chatMessages, currentContext, userMessage];
+    setChatMessages(prev => [...prev, userMessage]);
     setChatInput('');
     setShowEmojiPicker(false);
     sendToAI(updatedHistory, selectedImages);
@@ -1750,6 +1810,7 @@ export default function LevelUpApp() {
               </div>
             )}
             
+            {/* 修复：游戏模式下禁用重置按钮 */}
             {!isZen && (
              <button 
                onClick={() => {
@@ -1758,8 +1819,13 @@ export default function LevelUpApp() {
                    setTimeLeft(newTimeLeft);
                    saveTimerState(false, newTimeLeft, initialTime, mode);
                }}
-               className="absolute bottom-4 right-4 md:static w-12 h-12 rounded-full bg-gray-800/50 border border-gray-700 text-gray-400 flex items-center justify-center hover:text-white hover:border-gray-500 transition-all touch-manipulation"
-               title="重置计时"
+               disabled={mode === 'gaming'}
+               className={`absolute bottom-4 right-4 md:static w-12 h-12 rounded-full border flex items-center justify-center transition-all touch-manipulation ${
+                 mode === 'gaming' 
+                   ? 'bg-gray-800/30 border-gray-700 text-gray-600 cursor-not-allowed' 
+                   : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'
+               }`}
+               title={mode === 'gaming' ? "游戏模式下不可重置" : "重置计时"}
              >
                <RotateCcw className="w-4 h-4" />
              </button>
@@ -1802,14 +1868,34 @@ export default function LevelUpApp() {
       {/* AI Chat Modal (增强版) */}
       {showChatModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in zoom-in duration-200">
-          <div className="bg-[#111116] w-full h-full md:max-w-md md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800">
+          {/* 修改：响应式宽度调整 */}
+          <div className="bg-[#111116] w-full h-full md:max-w-2xl lg:max-w-4xl xl:max-w-5xl md:h-[85vh] md:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden border border-gray-800">
             {/* Chat Header (增强版) */}
             <div className="p-4 bg-[#16161c] border-b border-gray-800 flex justify-between items-center z-10 shadow-lg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg"><Sparkles className="w-5 h-5 text-white" /></div>
-                <div><h3 className="font-bold text-white text-sm">AI 导师</h3><p className="text-[10px] text-gray-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Online</p></div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">AI 导师</h3>
+                  <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> 
+                    Online
+                    {deepThinkingMode && <span className="ml-2 bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded text-[8px]">深度思考模式</span>}
+                  </p>
+                </div>
               </div>
               <div className="flex gap-2">
+                {/* 深度思考模式切换按钮 */}
+                <button 
+                  onClick={() => saveDeepThinkingMode(!deepThinkingMode)}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
+                    deepThinkingMode 
+                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50' 
+                      : 'bg-gray-800 text-gray-400 hover:text-blue-400 hover:bg-gray-700'
+                  }`}
+                  title={deepThinkingMode ? "切换到快速模式" : "切换到深度思考模式"}
+                >
+                  <BrainCircuit className="w-4 h-4"/>
+                </button>
                 <button 
                   onClick={startNewChat}
                   className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-blue-400 hover:bg-gray-700 transition"
@@ -1838,12 +1924,30 @@ export default function LevelUpApp() {
                     </div>
                   )}
                   
-                  <div className={`max-w-[75%] p-3.5 text-sm leading-relaxed shadow-md relative ${
+                  <div className={`max-w-[75%] lg:max-w-[80%] p-3.5 text-sm leading-relaxed shadow-md relative overflow-x-auto ${
                     msg.role === 'user' 
                       ? 'bg-emerald-600 text-white rounded-2xl rounded-tr-none' 
                       : 'bg-white text-gray-900 rounded-2xl rounded-tl-none'
                   }`}>
-                    {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
+                    {/* 用户消息显示图片 */}
+                    {msg.role === 'user' && msg.images && msg.images.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-white/80 text-xs mb-1">上传的图片:</div>
+                        <div className="flex gap-2 flex-wrap">
+                          {msg.images.map((img, imgIdx) => (
+                            <div key={imgIdx} className="relative">
+                              <img src={img.preview} alt="已发送的图片" className="w-16 h-16 object-cover rounded border border-white/20" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {msg.role === 'assistant' ? (
+                      <MarkdownMessage content={msg.content} />
+                    ) : (
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                    )}
                   </div>
 
                   {msg.role === 'user' && (
@@ -1854,11 +1958,11 @@ export default function LevelUpApp() {
                 </div>
               ))}
               
-              {/* 图片预览区域 */}
+              {/* 图片预览区域 - 发送前显示 */}
               {selectedImages.length > 0 && (
                 <div className="flex justify-end">
                   <div className="max-w-[75%] bg-emerald-600 p-3 rounded-2xl rounded-tr-none">
-                    <div className="text-white text-xs mb-2">上传的图片:</div>
+                    <div className="text-white text-xs mb-2">准备发送的图片:</div>
                     <div className="flex gap-2 flex-wrap">
                       {selectedImages.map(img => (
                         <div key={img.id} className="relative">
@@ -1886,6 +1990,7 @@ export default function LevelUpApp() {
                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+                    <span className="text-gray-500 text-xs ml-2">{deepThinkingMode ? "深度思考中..." : "思考中..."}</span>
                   </div>
                 </div>
               )}
@@ -2016,6 +2121,27 @@ export default function LevelUpApp() {
                       placeholder={DEFAULT_PERSONA}
                       className="w-full bg-black/50 border border-purple-500/30 rounded-lg p-3 text-white outline-none focus:border-purple-500 text-sm min-h-[80px] resize-none"
                     />
+                  </div>
+
+                  {/* 深度思考模式设置 */}
+                  <div className="bg-blue-900/20 p-4 rounded-xl border border-blue-500/30">
+                    <h3 className="text-blue-400 font-bold mb-3 flex items-center gap-2 text-sm"><BrainCircuit className="w-4 h-4"/> 回复模式</h3>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-white text-sm">深度思考模式</div>
+                        <div className="text-gray-400 text-xs">开启后回复更详细准确，但速度较慢</div>
+                      </div>
+                      <button 
+                        onClick={() => saveDeepThinkingMode(!deepThinkingMode)}
+                        className={`w-12 h-6 rounded-full transition-colors ${
+                          deepThinkingMode ? 'bg-blue-500' : 'bg-gray-600'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 bg-white rounded-full transform transition-transform ${
+                          deepThinkingMode ? 'translate-x-7' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* 每日目标时长设置 */}
